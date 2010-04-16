@@ -222,7 +222,7 @@
                                                 term-name))))))))
 
 
-(defconstant +m8b-answers+ 
+(defparameter *m8b-answers*
   '("As I see it, yes"
     "It is certain"
     "It is decidedly so"
@@ -242,11 +242,13 @@
     "My reply is no"
     "My sources say no"
     "Outlook not so good"
-    "Very doubtful"))
+    "Very doubtful"
+    "You have AIDS anyway"))
 
-(defbotf m8b (message)
-  (with-irc (reply-to message (nth (random (length +m8b-answers+)) 
-                                   +m8b-answers+))))
+(defbotf m8b (message &rest question)
+  (declare (ignore question))
+  (with-irc (reply-to message (nth (random (length *m8b-answers*)) 
+                                   *m8b-answers*))))
 
 (defbotf ping (message)
   (with-irc 
