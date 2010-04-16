@@ -247,3 +247,8 @@
 (defbotf m8b (message)
   (with-irc (reply-to message (nth (random (length +m8b-answers+)) 
                                    +m8b-answers+))))
+
+(defbotf ping (message)
+  (with-irc 
+    (reply-to message 
+              (format nil "~A: pong" (source message)))))
