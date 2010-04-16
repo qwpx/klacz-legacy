@@ -67,7 +67,7 @@
   (quit *irc-connection*))
 
 (defun parse-message-line (line)
-  (let ((result (ppcre:split "\\s+" line :limit 2)))
+  (bind ((result (ppcre:split "\\s+" line :limit 2)))
     (if (null (cdr result))
         (list (car result) "")
         result)))
@@ -81,7 +81,7 @@
 
 (defun find-applicable-function (message-line)
   (when (char= #\, (aref message-line 0))
-    (let ((message-line (subseq message-line 1)))
+    (bind ((message-line (subseq message-line 1)))
       (bind (((function-name args-string) (parse-message-line message-line))
              ((:values result found-p) (gethash (string-upcase function-name)
                                                 *bot-functions*)))
@@ -120,7 +120,7 @@
                (setf *message-pool* cdrs))))
 
 (defmethod reply-to (message (text string))
-  (let ((lines (ppcre:split "\\n+" text)))
+  (bind ((lines (ppcre:split "\\n+" text)))
     (reply-to message lines)))
 
 (defmacro with-irc (&body body)
@@ -151,7 +151,7 @@
   (with-irc (reply-to message text)))
 
 (defbotf + (message a b)
-  (let ((a (parse-integer a))
+  (bind ((a (parse-integer a))
         (b (parse-integer b)))
     (with-irc (reply-to message (format nil "~D" (+ a b))))))
 
@@ -165,7 +165,7 @@
 
 (defbotf add (message term-name &rest text)
   (with-transaction
-    (let ((term (select-instance (t term)
+    (bind ((term (select-instance (t term)
                   (where (eq (name-of t) term-name)))))
       (unless term
         (setf term (make-instance 'term :name term-name))
@@ -180,7 +180,7 @@
                                     term-name))))))
 
 (defmacro with-term ((var-name term-name message) &body body)
-  `(let ((,var-name (select-instance (t term)
+  `(bind ((,var-name (select-instance (t term)
                       (where (eq (name-of t) ,term-name)))))
      (if (null ,var-name)
          (with-irc (reply-to ,message (format nil "Term \"~A\" not found." ,term-name)))
@@ -190,7 +190,7 @@
 (defbotf describe (message term-name)
   (with-transaction 
     (with-term (term term-name message)
-      (let* ((n 0)
+      (bind ((n 0)
              (lines (list* (format nil "I heard \"~A\" is:" term-name)
                            (mapcar (lambda (entry)
                                      (prog1
@@ -206,7 +206,7 @@
 (defbotf forget (message term-name entry-number)
   (with-transaction
     (with-term (term term-name message)
-      (let* ((clean-number (parse-integer entry-number))
+      (bin* ((clean-number (parse-integer entry-number))
              (entry (first
                      (select-instances (e entry)
                        (where (and (eq (term-of e) term)
@@ -254,3 +254,16 @@
   (with-irc 
     (reply-to message 
               (format nil "~A: pong" (source message)))))
+
+(defbotf pick (message &rest arguments)
+  (flet ((sum-vector (vector)
+           (loop for n across vector sum n)))
+    (bind ((words (ppcre:split "\\s+" arguments))
+           (hashes (mapcar (lambda (w)
+                             (list w (sum-vector 
+                                      (ironclad:digest-sequence 
+                                       :md5 (babel:string-to-octets w)))))
+                           words)))
+      (with-irc (reply-to message 
+                          (format nil "~{~A~^ > ~}"
+                                  (mapcar #'first (sort hashes #'> :key #'second))))))))
