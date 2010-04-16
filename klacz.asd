@@ -20,7 +20,8 @@
                  :alexandria
                  :hu.dwim.perec
                  :hu.dwim.perec.postgresql
-                 :chanl)
+                 :chanl
+                 :ironclad)
     :serial t
     :components ((:file "package")
                  (:file "database")
