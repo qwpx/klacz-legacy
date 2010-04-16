@@ -21,9 +21,12 @@
                  :hu.dwim.perec
                  :hu.dwim.perec.postgresql
                  :chanl
-                 :ironclad)
+                 :ironclad
+                 :drakma)
     :serial t
     :components ((:file "package")
                  (:file "database")
-		 (:file "irc")))
+		 (:file "irc")
+                 (:file "functions")
+                 (:file "web-queries")))
 
