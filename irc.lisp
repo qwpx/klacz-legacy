@@ -174,7 +174,8 @@
                    :channel (first (arguments message))
                    :kind 'part
                    :nick (source message)
-                   :message (second (arguments message)))))
+                   :message (or (second (arguments message))
+                                ""))))
 
 (defmethod log-hook ((message irc-quit-message))
   (with-transaction 
@@ -207,7 +208,7 @@
 (defbotf add (message term-name &rest text)
   (with-transaction
     (bind ((term (select-instance (t term)
-                  (where (eq (name-of t) term-name)))))
+                   (where (like (name-of t) term-name :case-sensitive-p nil)))))
       (unless term
         (setf term (make-instance 'term :name term-name))
         (with-irc 

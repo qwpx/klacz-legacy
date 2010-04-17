@@ -91,3 +91,7 @@
                    :message text))
   (with-irc 
     (reply-to message (format nil "Added memo for \"~A\"." nick))))
+
+(defbotf time (message)
+  (with-irc
+    (reply-to message (format-timestring nil (now) :format *date-format*))))

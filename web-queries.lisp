@@ -28,13 +28,19 @@
 
 (defun do-wolfram-search (term)
   (let ((result (drakma:http-request *wolfram-api-url*
-                                     :parameters `(("i" . ,term)))))
-    (ppcre:register-groups-bind (wolfram-result) ; dirty stuff, but who gives a shit
-        ("\\{\"stringified\": \"(.*?)\"" result)
-     wolfram-result)))
+                                     :parameters `(("i" . ,term))))
+        all-results)
+    (ppcre:do-register-groups (wolfram-result) 
+        ("\\{\"stringified\": \"\\s*?(.*?)\\s*?\"" result)
+      (push wolfram-result all-results))
+    (nreverse all-results))) ; dirty stuff, but who gives a shit
+
+
 
 (defbotf c (message &rest term)
-  (with-irc (reply-to message (do-wolfram-search term))))
+  (with-irc (reply-to message 
+              (format nil "~{~A~^ | ~}"
+                      (do-wolfram-search term)))))
 
 (defparameter *bing-api-url*
   "http://api.search.live.net/json.aspx")

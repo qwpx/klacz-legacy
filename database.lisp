@@ -48,3 +48,4 @@
    (date (transaction-timestamp) :type timestamp)
    (active t :type boolean)
    (message :type (text 256))))
+
