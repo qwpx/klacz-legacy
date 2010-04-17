@@ -29,7 +29,7 @@
 (defun do-wolfram-search (term)
   (let ((result (drakma:http-request *wolfram-api-url*
                                      :parameters `(("i" . ,term)))))
-    (ppcre:register-groups-bind (wolfram-result) 
+    (ppcre:register-groups-bind (wolfram-result) ; dirty stuff, but who gives a shit
         ("\\{\"stringified\": \"(.*?)\"" result)
      wolfram-result)))
 

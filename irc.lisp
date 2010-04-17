@@ -29,7 +29,11 @@
 
 (defun shuffle-hooks ()
   (remove-hooks *irc-connection* 'irc-privmsg-message)
-  (add-hook *irc-connection* 'irc-privmsg-message #'privmsg-hook))
+  (add-hook *irc-connection* 'irc-privmsg-message #'privmsg-hook)
+  (add-hook *irc-connection* 'irc-privmsg-message #'log-hook)
+  (add-hook *irc-connection* 'irc-join-message #'log-hook)
+  (add-hook *irc-connection* 'irc-part-message #'log-hook)
+  (add-hook *irc-connection* 'irc-quit-message #'log-hook))
 
 (defun start-connection (&key (shuffle-hooks-p t))
   (flet ((reader-loop ()
@@ -146,3 +150,35 @@
                          (reply-to message (format nil "~A" var)))))))
           (bordeaux-threads:make-thread #'worker-function                  
                                         :name "worker thread"))))))
+
+(defmethod log-hook ((message irc-privmsg-message))
+  (with-transaction 
+    (make-instance 'log-entry 
+                   :channel (first (arguments message))
+                   :kind 'privmsg
+                   :nick (source message)
+                   :message (second (arguments message)))))
+
+(defmethod log-hook ((message irc-join-message))
+  (with-transaction 
+    (make-instance 'log-entry 
+                   :channel (first (arguments message))
+                   :kind 'join
+                   :nick (source message)
+                   :message "")))
+
+(defmethod log-hook ((message irc-part-message))
+  (with-transaction 
+    (make-instance 'log-entry 
+                   :channel (first (arguments message))
+                   :kind 'part
+                   :nick (source message)
+                   :message (second (arguments message)))))
+
+(defmethod log-hook ((message irc-quit-message))
+  (with-transaction 
+    (make-instance 'log-entry 
+                   :channel ""
+                   :kind 'quit
+                   :nick (source message)
+                   :message (first (arguments message)))))

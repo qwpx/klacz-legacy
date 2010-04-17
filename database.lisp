@@ -37,3 +37,10 @@
     ((:class term :slot entries :type (set entry))
      (:class entry :slot term :type term)))
    
+
+(defpclass* log-entry ()
+  ((channel :type (text 64))
+   (kind :type (member action privmsg join part quit))
+   (nick :type (text 64))
+   (date (transaction-timestamp) :type timestamp)
+   (message :type (text 256))))

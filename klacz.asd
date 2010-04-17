@@ -22,7 +22,8 @@
                  :hu.dwim.perec.postgresql
                  :chanl
                  :ironclad
-                 :drakma)
+                 :drakma
+                 :cl-json)
     :serial t
     :components ((:file "package")
                  (:file "database")
