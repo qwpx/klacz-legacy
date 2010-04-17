@@ -1,9 +1,5 @@
 (in-package :klacz)
 
-(defparameter *database-name* "klacz")
-(defparameter *database-user* "klacz")
-(defparameter *database-password* "klacz")
-
 (defclass database-connection
     (hu.dwim.perec:postgresql/perec)
   ())
@@ -43,4 +39,12 @@
    (kind :type (member action privmsg join part quit))
    (nick :type (text 64))
    (date (transaction-timestamp) :type timestamp)
+   (message :type (text 256))))
+
+(defpclass* memo ()
+  ((channel :type (text 64))
+   (from :type (text 64))
+   (to :type (text 64))
+   (date (transaction-timestamp) :type timestamp)
+   (active t :type boolean)
    (message :type (text 256))))

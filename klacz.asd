@@ -23,9 +23,11 @@
                  :chanl
                  :ironclad
                  :drakma
-                 :cl-json)
+                 :cl-json
+                 :local-time)
     :serial t
     :components ((:file "package")
+                 (:file "settings")
                  (:file "database")
 		 (:file "irc")
                  (:file "functions")

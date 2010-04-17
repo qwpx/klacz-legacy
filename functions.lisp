@@ -131,8 +131,21 @@
                                 (limit 1))))
            (reply (if last-entry
                       (with-slots (nick date kind message) last-entry
-                        (format nil "Last seen ~A: ~A ~A ~A" nick date kind message))
+                        (format nil "Last seen ~A: ~A ~A ~A" 
+                                nick 
+                                (format-timestring nil date :format *date-format*)
+                                kind message))
                       (format nil "Never seen ~A." nick))))
       (with-irc 
         (reply-to message reply)))))
                                      
+
+(defbotf memo (message nick &rest text)
+  (with-transaction 
+    (make-instance 'memo 
+                   :channel (first (arguments message))
+                   :from (source message)
+                   :to nick
+                   :message text))
+  (with-irc 
+    (reply-to message (format nil "Added memo for \"~A\"." nick))))

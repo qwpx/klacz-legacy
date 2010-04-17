@@ -4,11 +4,6 @@
   "IRC connection")
 
 
-
-(defparameter *irc-nickname* "klacz")
-(defparameter *irc-server* "irc.freenode.net")
-(defparameter *irc-channels* '("#xyzzytest" "#qwpx"))
-
 (defparameter *end-connection* nil)
 
 (defparameter *irc-reader-thread* nil)
@@ -30,6 +25,7 @@
 (defun shuffle-hooks ()
   (remove-hooks *irc-connection* 'irc-privmsg-message)
   (add-hook *irc-connection* 'irc-privmsg-message #'privmsg-hook)
+  (add-hook *irc-connection* 'irc-privmsg-message #'memo-hook)
   (add-hook *irc-connection* 'irc-privmsg-message #'log-hook)
   (add-hook *irc-connection* 'irc-join-message #'log-hook)
   (add-hook *irc-connection* 'irc-part-message #'log-hook)
@@ -117,10 +113,11 @@
      do (privmsg (connection message) 
                  (first (arguments message)) 
                  (car cdrs))
-     finally (when cdrs
-               (privmsg (connection message) 
-                        (first (arguments message)) 
-                        "But wait, there's more! (type ,more)")
+     finally (progn 
+               (when cdrs
+                 (privmsg (connection message) 
+                          (first (arguments message)) 
+                          "But wait, there's more! (type ,more)"))
                (setf *message-pool* cdrs))))
 
 (defmethod reply-to (message (text string))
@@ -182,3 +179,24 @@
                    :kind 'quit
                    :nick (source message)
                    :message (first (arguments message)))))
+
+(defmethod memo-hook ((message irc-privmsg-message))
+  (with-transaction
+    (bind ((memos (select-instances (m memo)
+                    (where (and (active-p m)
+                                (eq (to-of m) (source message))))))
+           (lines (list* (format nil "~A: You've got ~D new message~:P:"
+                                 (source message) (length memos))
+                         (mapcar (lambda (memo)
+                                   (format nil "From ~A at ~A: ~A"
+                                           (from-of memo)
+                                           (format-timestring nil (date-of memo)
+                                                              :format *date-format*)
+                                           (message-of memo)))
+                                 memos))))
+      (when memos
+        (mapc (lambda (m) (setf (active-p m) nil)) memos)
+        (with-irc 
+          (reply-to message lines))))))
+        
+                           
