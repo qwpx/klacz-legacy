@@ -6,7 +6,7 @@
 
 (defbotf + (message a b)
   (bind ((a (parse-integer a))
-        (b (parse-integer b)))
+         (b (parse-integer b)))
     (with-irc (reply-to message (format nil "~D" (+ a b))))))
 
 (defbotf more (message)
@@ -15,8 +15,6 @@
 (defbotf debug (message)
   (with-irc (reply-to message "Invoked debugger"))
   (break))
-
-
 
 (defparameter *m8b-answers*
   '("As I see it, yes"
@@ -41,7 +39,7 @@
     "Very doubtful"
     "You have AIDS anyway"))
 
-(defbotf m8b (message &rest question)
+(defbotf 8b (message &rest question)
   (declare (ignore question))
   (with-irc (reply-to message (nth (random (length *m8b-answers*)) 
                                    *m8b-answers*))))
@@ -80,7 +78,7 @@
                       (format nil "Never seen ~A." nick))))
       (with-irc 
         (reply-to message reply)))))
-                                     
+
 
 (defbotf memo (message nick &rest text)
   (with-transaction 
@@ -95,3 +93,25 @@
 (defbotf time (message)
   (with-irc
     (reply-to message (format-timestring nil (now) :format *date-format*))))
+
+(defbotf help (message)
+  (bot-describe message "help"))
+
+(defbotf s (message term-name entry-number regexp)
+  (with-transaction
+    (with-term (term term-name message) 
+      (bind ((clean-number (parse-integer entry-number)))
+        (with-entry (entry term clean-number message)
+          (or (ppcre:register-groups-bind (from to) ("^/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/$" regexp)
+                (bind (((:values result match-p) (ppcre:regex-replace-all from (text-of entry) to)))
+                  (if match-p 
+                      (progn 
+                        (setf (text-of entry) result)
+                        (with-irc (reply-to message 
+                                            (format nil "Replaced string in ~:R entry in term \"~A\"."
+                                                    clean-number term-name))))
+                      (with-irc (reply-to message "No replacements performed.")))
+                  t))
+              (with-irc
+                (reply-to message (format nil "Incorrect regexp.")))))))))
+        

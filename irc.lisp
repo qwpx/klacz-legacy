@@ -116,8 +116,11 @@
      finally (progn 
                (when cdrs
                  (privmsg (connection message) 
-                          (first (arguments message)) 
-                          "But wait, there's more! (type ,more)"))
+                          (if (string= (first (arguments message)) *irc-nickname*)
+                              (source message)
+                              (first (arguments message)))
+                          (format nil "But wait, there's more! (~D more, type ,more)"
+                                  (length cdrs))))
                (setf *message-pool* cdrs))))
 
 (defmethod reply-to (message (text string))
@@ -245,23 +248,32 @@
       (with-irc (reply-to message lines))))))
 
 
+(defmacro with-entry ((var term entry-number message) &body body)
+  (bind ((term-name (gensym)))
+    `(bind ((,var (first
+                   (select-instances (e entry)
+                     (where (and (eq (term-of e) ,term)
+                                 (eq (visible-p e) t)))
+                     (offset ,entry-number)
+                     (limit 1)
+                     (order-by :ascending (added-at-of e)))))
+            (,term-name (name-of ,term)))
+        (if ,var
+            (progn 
+              ,@body)
+            (with-irc (reply-to ,message (format nil "No such entry in term \"~A\"."
+                                                 ,term-name)))))))
+                      
+
 (defbotf forget (message term-name entry-number)
   (with-transaction
     (with-term (term term-name message)
-      (bind ((clean-number (parse-integer entry-number))
-             (entry (first
-                     (select-instances (e entry)
-                       (where (and (eq (term-of e) term)
-                                   (eq (visible-p e) t)))
-                       (offset clean-number)
-                       (limit 1)))))
-        (if entry 
-            (progn 
-              (setf (visible-p entry) nil)
-              (with-irc (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
-                                                  clean-number term-name))))
-            (with-irc (reply-to message (format nil "No such entry in term \"~A\"."
-                                                term-name))))))))
+      (bind ((clean-number (parse-integer entry-number)))
+        (with-entry (entry term clean-number message)
+          (setf (visible-p entry) nil)
+          (with-irc 
+            (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
+                                      clean-number term-name))))))))
 
 
 (defbotf random-entry (message term-name)
