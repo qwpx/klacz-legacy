@@ -17,64 +17,6 @@
   (break))
 
 
-(defbotf add (message term-name &rest text)
-  (with-transaction
-    (bind ((term (select-instance (t term)
-                  (where (eq (name-of t) term-name)))))
-      (unless term
-        (setf term (make-instance 'term :name term-name))
-        (reply-to message (format nil "Created term \"~A\"." term-name)))
-      (make-instance 'entry
-                     :text text
-                     :visible t
-                     :term term
-                     :added-by (source message))
-      (with-irc 
-          (reply-to message (format nil "Added one entry to term \"~A\"." 
-                                    term-name))))))
-
-(defmacro with-term ((var-name term-name message) &body body)
-  `(bind ((,var-name (select-instance (t term)
-                      (where (eq (name-of t) ,term-name)))))
-     (if (null ,var-name)
-         (with-irc (reply-to ,message (format nil "Term \"~A\" not found." ,term-name)))
-         (progn 
-           ,@body))))
-
-(defbotf describe (message term-name)
-  (with-transaction 
-    (with-term (term term-name message)
-      (bind ((n 0)
-             (lines (list* (format nil "I heard \"~A\" is:" term-name)
-                           (mapcar (lambda (entry)
-                                     (prog1
-                                         (format nil "[~D] ~A" n (text-of entry))
-                                       (incf n)))
-                                   (select-instances (e entry)
-                                     (where (and (eq (term-of e) term)
-                                                 (eq (visible-p e) t)))
-                                     (order-by :ascending (added-at-of e)))))))
-      (with-irc (reply-to message lines))))))
-
-
-(defbotf forget (message term-name entry-number)
-  (with-transaction
-    (with-term (term term-name message)
-      (bind ((clean-number (parse-integer entry-number))
-             (entry (first
-                     (select-instances (e entry)
-                       (where (and (eq (term-of e) term)
-                                   (eq (visible-p e) t)))
-                       (offset clean-number)
-                       (limit 1)))))
-        (if entry 
-            (progn 
-              (setf (visible-p entry) nil)
-              (with-irc (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
-                                                  clean-number term-name))))
-            (with-irc (reply-to message (format nil "No such entry in term \"~A\"."
-                                                term-name))))))))
-
 
 (defparameter *m8b-answers*
   '("As I see it, yes"

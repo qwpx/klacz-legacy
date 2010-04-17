@@ -35,3 +35,31 @@
 
 (defbotf c (message &rest term)
   (with-irc (reply-to message (do-wolfram-search term))))
+
+(defparameter *bing-api-url*
+  "http://api.search.live.net/json.aspx")
+
+(defun find-subtree (item tree &key (test #'equal))
+  (cond 
+    ((null tree) nil)
+    ((atom tree) nil)
+    ((funcall test item (car tree)) (cdr tree))
+    (t (or (find-subtree item (car tree) :test test)
+           (find-subtree item (cdr tree) :test test)))))
+
+(defun do-bing-search (term)
+  (with-input-from-string (s (babel:octets-to-string
+                              (drakma:http-request *bing-api-url* 
+                                                   :parameters `(("Appid" . ,*bing-appid*)
+                                                                 ("query" . ,term)
+                                                                 ("sources" . "web")))))
+    (find-subtree :*results (json:decode-json s))))
+
+(defbotf b (message &rest term)
+  (bind ((result (first (do-bing-search term))))
+    (with-irc 
+      (reply-to message 
+                (format nil "~A -- ~A - ~A"
+                        (cdr (assoc :*url result))
+                        (cdr (assoc :*title result))
+                        (cdr (assoc :*description result)))))))

@@ -25,7 +25,7 @@
 
 (defpclass* entry () 
   ((text :type (text 256))
-   (visible :type boolean)
+   (visible t :type boolean)
    (added-at (transaction-timestamp) :type timestamp)
    (added-by :type (text 64))))
 

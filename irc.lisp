@@ -133,6 +133,10 @@
   (with-simple-restart (continue "Continue processing IRC messages")
     (bind ((message-line (second (arguments message)))
            ((:values function args) (find-applicable-function message-line)))
+      (when (and (null function)
+                 (char= (aref message-line 0) #\,))
+        (setf function #'bot-random-entry
+              args (list (subseq message-line 1))))
       (when function
         (flet ((worker-function ()
                  (handler-case 
@@ -199,4 +203,77 @@
         (with-irc 
           (reply-to message lines))))))
         
+
+(defbotf add (message term-name &rest text)
+  (with-transaction
+    (bind ((term (select-instance (t term)
+                  (where (eq (name-of t) term-name)))))
+      (unless term
+        (setf term (make-instance 'term :name term-name))
+        (with-irc 
+          (reply-to message (format nil "Created term \"~A\"." term-name))))
+      (make-instance 'entry
+                     :text text
+                     :visible t
+                     :term term
+                     :added-by (source message))
+      (with-irc 
+          (reply-to message (format nil "Added one entry to term \"~A\"." 
+                                    term-name))))))
+(defmacro with-term ((var-name term-name message) &body body)
+  `(bind ((,var-name (select-instance (t term)
+                       (where (like (name-of t) ,term-name :case-sensitive-p nil)))))
+     (if (null ,var-name)
+         (with-irc (reply-to ,message (format nil "Term \"~A\" not found." ,term-name)))
+         (progn 
+           ,@body))))
+
+(defbotf describe (message term-name)
+  (with-transaction 
+    (with-term (term term-name message)
+      (bind ((n 0)
+             (lines (list* (format nil "I heard \"~A\" is:" term-name)
+                           (mapcar (lambda (entry)
+                                     (prog1
+                                         (format nil "[~D] ~A" n (text-of entry))
+                                       (incf n)))
+                                   (select-instances (e entry)
+                                     (where (and (eq (term-of e) term)
+                                                 (eq (visible-p e) t)))
+                                     (order-by :ascending (added-at-of e)))))))
+      (with-irc (reply-to message lines))))))
+
+
+(defbotf forget (message term-name entry-number)
+  (with-transaction
+    (with-term (term term-name message)
+      (bind ((clean-number (parse-integer entry-number))
+             (entry (first
+                     (select-instances (e entry)
+                       (where (and (eq (term-of e) term)
+                                   (eq (visible-p e) t)))
+                       (offset clean-number)
+                       (limit 1)))))
+        (if entry 
+            (progn 
+              (setf (visible-p entry) nil)
+              (with-irc (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
+                                                  clean-number term-name))))
+            (with-irc (reply-to message (format nil "No such entry in term \"~A\"."
+                                                term-name))))))))
+
+
+(defbotf random-entry (message term-name)
+  (with-transaction
+    (with-term (term term-name message)
+      (bind ((count (first (select ((count e)) (from (e entry)) 
+                                   (where (eq (term-of e) term))))))
+        (when count
+          (bind ((entry (first (select-instances (e entry) 
+                                 (where (and (eq (term-of e) term)
+                                             (eq (visible-p e) t)))
+                                 (offset (random count))
+                                 (limit 1))))
+                 (text (text-of entry)))
+            (with-irc (reply-to message (format nil "~A" text)))))))))
                            
