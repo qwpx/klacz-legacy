@@ -29,7 +29,12 @@
   (add-hook *irc-connection* 'irc-privmsg-message #'log-hook)
   (add-hook *irc-connection* 'irc-join-message #'log-hook)
   (add-hook *irc-connection* 'irc-part-message #'log-hook)
-  (add-hook *irc-connection* 'irc-quit-message #'log-hook))
+  (add-hook *irc-connection* 'irc-quit-message #'log-hook)
+  (add-hook *irc-connection* 'irc-rpl_whoisidentified-message #'whoisidentified-hook)
+  (add-hook *irc-connection* 'irc-kick-message #'unidentify-hook)
+  (add-hook *irc-connection* 'irc-part-message #'unidentify-hook)
+  (add-hook *irc-connection* 'irc-quit-message #'unidentify-hook)
+  (add-hook *irc-connection* 'irc-join-message #'identify-hook))
 
 (defun start-connection (&key (shuffle-hooks-p t))
   (flet ((reader-loop ()
@@ -38,7 +43,7 @@
          (writer-loop ()
            (loop until *end-connection*
               for f = (chanl:recv *channel*)
-                do (funcall f))))
+              do (funcall f))))
     (setf *end-connection* nil)
     (init-connection)
     (when shuffle-hooks-p
@@ -75,7 +80,7 @@
 (defun split-arguments (args arity rest-p)
   (when (and rest-p (zerop arity))
     (error "improper function definition"))
-  (ppcre:split ",?\\s+" args :limit (and rest-p arity)))
+  (ppcre:split ",?\\s+" args :limit (when rest-p arity)))
 
 (defparameter *bot-functions* (make-hash-table :test 'equal))
 
@@ -86,22 +91,36 @@
              ((:values result found-p) (gethash (string-upcase function-name)
                                                 *bot-functions*)))
         (when found-p
-          (bind (((function arity rest-p) result)
+          (bind (((function arity rest-p level) result)
                  (args (split-arguments args-string arity rest-p)))
             (when (= (length args) arity)
-              (values function args))))))))
+              (values function args level))))))))
 
 
-(defmacro defbotf (name lambda-list &body body)
-  `(progn 
-     (defun ,(intern (concatenate 'string (string :bot-) (string name)))
-         ,(remove '&rest lambda-list)
-       ,@body)
-     (setf (gethash (string ',name) *bot-functions*)
-           (list (function ,(intern (concatenate 'string (string :bot-) 
-                                                 (string name))))
-                 ,(1- (length (remove '&rest lambda-list)))
-                 ',(find '&rest lambda-list)))))
+(defun parse-defbotf (cdr-of-form)
+  (declare (list cdr-of-form))
+  (let ((name (pop cdr-of-form))
+        (qualifiers ())
+        (spec-ll ()))
+    (loop (if (and (car cdr-of-form) (atom (car cdr-of-form)))
+              (push (pop cdr-of-form) qualifiers)
+              (return (setq qualifiers (nreverse qualifiers)))))
+    (setq spec-ll (pop cdr-of-form))
+    (values name qualifiers spec-ll cdr-of-form)))  
+
+(defmacro defbotf (&rest args)
+  (bind (((:values name qualifiers lambda-list body) (parse-defbotf args))
+         ((&key (level 0)) qualifiers))
+    `(progn 
+       (defun ,(intern (concatenate 'string (string :bot-) (string name)))
+           ,(remove '&rest lambda-list)
+         ,@body)
+       (setf (gethash (string ',name) *bot-functions*)
+             (list (function ,(intern (concatenate 'string (string :bot-) 
+                                                   (string name))))
+                   ,(1- (length (remove '&rest lambda-list)))
+                   ',(find '&rest lambda-list)
+                   ,level)))))
 
 
 (defparameter *message-pool* nil)
@@ -137,23 +156,29 @@
 (defun handle-message (message)
   (with-simple-restart (continue "Continue processing IRC messages")
     (bind ((message-line (second (arguments message)))
-           ((:values function args) (find-applicable-function message-line)))
+           ((:values function args level) (find-applicable-function message-line)))
       (when (and (null function)
                  (char= (aref message-line 0) #\,))
         (setf function #'bot-random-entry
-              args (list (subseq message-line 1))))
+              args (list (subseq message-line 1))
+              level 0))
       (when function
+        (when (< (level-of (source message)) level)
+          (with-irc 
+            (reply-to message (format nil "You do not have right to call this function (your level is ~D, need ~D)"
+                                      (level-of (source message)) level)))
+          (return-from handle-message nil))
         (flet ((worker-function ()
                  (handler-case 
                      (apply function (cons message args))
                    (error (var) 
                      (with-irc
-                         (reply-to message 
-                                   (format nil "An error has been encountered: ~A" 
-                                           var))))
+                       (reply-to message 
+                                 (format nil "An error has been encountered: ~A" 
+                                         var))))
                    (warning (var) 
                      (with-irc
-                         (reply-to message (format nil "~A" var)))))))
+                       (reply-to message (format nil "~A" var)))))))
           (bordeaux-threads:make-thread #'worker-function                  
                                         :name "worker thread"))))))
 
@@ -208,22 +233,22 @@
         (mapc (lambda (m) (setf (active-p m) nil)) memos)
         (with-irc 
           (reply-to message lines))))))
-        
+
 
 (defbotf add (message term-name &rest text)
-  (with-transaction
-    (bind ((term (select-instance (t term)
-                   (where (like (name-of t) term-name :case-sensitive-p nil)))))
-      (unless term
-        (setf term (make-instance 'term :name term-name))
+    (with-transaction
+      (bind ((term (select-instance (t term)
+                     (where (like (name-of t) term-name :case-sensitive-p nil)))))
+        (unless term
+          (setf term (make-instance 'term :name term-name))
+          (with-irc 
+            (reply-to message (format nil "Created term \"~A\"." term-name))))
+        (make-instance 'entry
+                       :text text
+                       :visible t
+                       :term term
+                       :added-by (source message))
         (with-irc 
-          (reply-to message (format nil "Created term \"~A\"." term-name))))
-      (make-instance 'entry
-                     :text text
-                     :visible t
-                     :term term
-                     :added-by (source message))
-      (with-irc 
           (reply-to message (format nil "Added one entry to term \"~A\"." 
                                     term-name))))))
 (defmacro with-term ((var-name term-name message) &body body)
@@ -235,19 +260,19 @@
            ,@body))))
 
 (defbotf describe (message term-name)
-  (with-transaction 
-    (with-term (term term-name message)
-      (bind ((n 0)
-             (lines (list* (format nil "I heard \"~A\" is:" term-name)
-                           (mapcar (lambda (entry)
-                                     (prog1
-                                         (format nil "[~D] ~A" n (text-of entry))
-                                       (incf n)))
-                                   (select-instances (e entry)
-                                     (where (and (eq (term-of e) term)
-                                                 (eq (visible-p e) t)))
-                                     (order-by :ascending (added-at-of e)))))))
-      (with-irc (reply-to message lines))))))
+    (with-transaction 
+      (with-term (term term-name message)
+        (bind ((n 0)
+               (lines (list* (format nil "I heard \"~A\" is:" term-name)
+                             (mapcar (lambda (entry)
+                                       (prog1
+                                           (format nil "[~D] ~A" n (text-of entry))
+                                         (incf n)))
+                                     (select-instances (e entry)
+                                       (where (and (eq (term-of e) term)
+                                                   (eq (visible-p e) t)))
+                                       (order-by :ascending (added-at-of e)))))))
+          (with-irc (reply-to message lines))))))
 
 
 (defmacro with-entry ((var term entry-number message) &body body)
@@ -260,35 +285,98 @@
                      (limit 1)
                      (order-by :ascending (added-at-of e)))))
             (,term-name (name-of ,term)))
-        (if ,var
-            (progn 
-              ,@body)
-            (with-irc (reply-to ,message (format nil "No such entry in term \"~A\"."
-                                                 ,term-name)))))))
-                      
+       (if ,var
+           (progn 
+             ,@body)
+           (with-irc (reply-to ,message (format nil "No such entry in term \"~A\"."
+                                                ,term-name)))))))
 
-(defbotf forget (message term-name entry-number)
-  (with-transaction
-    (with-term (term term-name message)
-      (bind ((clean-number (parse-integer entry-number)))
-        (with-entry (entry term clean-number message)
-          (setf (visible-p entry) nil)
-          (with-irc 
-            (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
-                                      clean-number term-name))))))))
+
+(defbotf forget :level 2 (message term-name entry-number)
+    (with-transaction
+      (with-term (term term-name message)
+        (bind ((clean-number (parse-integer entry-number)))
+          (with-entry (entry term clean-number message)
+            (setf (visible-p entry) nil)
+            (with-irc 
+              (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
+                                        clean-number term-name))))))))
 
 
 (defbotf random-entry (message term-name)
+    (with-transaction
+      (with-term (term term-name message)
+        (bind ((count (first (select ((count e)) (from (e entry)) 
+                                     (where (and (eq (term-of e) term)
+                                                 (eq (visible-p e) t)))))))
+          (when count
+            (bind ((entry (first (select-instances (e entry) 
+                                   (where (and (eq (term-of e) term)
+                                               (eq (visible-p e) t)))
+                                   (offset (random count))
+                                   (limit 1))))
+                   (text (text-of entry)))
+              (with-irc (reply-to message (format nil "~A" text)))))))))
+
+
+(defbotf s (message term-name entry-number regexp)
   (with-transaction
-    (with-term (term term-name message)
-      (bind ((count (first (select ((count e)) (from (e entry)) 
-                                   (where (eq (term-of e) term))))))
-        (when count
-          (bind ((entry (first (select-instances (e entry) 
-                                 (where (and (eq (term-of e) term)
-                                             (eq (visible-p e) t)))
-                                 (offset (random count))
-                                 (limit 1))))
-                 (text (text-of entry)))
-            (with-irc (reply-to message (format nil "~A" text)))))))))
-                           
+    (with-term (term term-name message) 
+      (bind ((clean-number (parse-integer entry-number)))
+        (with-entry (entry term clean-number message)
+          (or (ppcre:register-groups-bind (from to) ("^/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/$" regexp)
+                (bind (((:values result match-p) (ppcre:regex-replace-all from (text-of entry) to)))
+                  (if match-p 
+                      (progn 
+                        (setf (text-of entry) result)
+                        (with-irc (reply-to message 
+                                            (format nil "Replaced string in ~:R entry in term \"~A\"."
+                                                    clean-number term-name))))
+                      (with-irc (reply-to message "No replacements performed.")))
+                  t))
+              (with-irc
+                (reply-to message (format nil "Incorrect regexp.")))))))))
+
+
+
+(defparameter *identified-db* (make-hash-table :test #'equal))
+
+(defmethod unidentify-hook (message)
+  (remhash (source message) *identified-db*))
+
+(defmethod unidentify-hook ((message irc-kick-message))
+  (remhash (second (arguments message)) *identified-db*))
+
+(defmethod whoisidentified-hook ((message irc-rpl_whoisidentified-message))
+  (setf (gethash (second (arguments message)) *identified-db*) 
+        (third (arguments message))))
+
+(defmethod identify-hook ((message irc-join-message))
+  (identify-nick (source message)))
+
+(defun identify-nick (nick)
+  (with-irc (whois *irc-connection* nick)))
+
+(defbotf identify (message)
+    (identify-nick (source message)))
+
+(defbotf identified-p (message)
+    (bind (((:values account found-p) (gethash (source message) *identified-db*)))
+      (with-irc 
+        (reply-to message
+                  (if found-p
+                      (format nil "~A is logged in as ~A" (source message) account)
+                      (format nil "~A is not logged in" (source message)))))))
+
+(defun nick-account (nick)
+  (gethash nick *identified-db*))
+
+
+(defparameter *acl*
+  '(("Dodecki" . 9001)))
+
+(defun level-of (nick)
+  (or (awhen (nick-account nick)
+        (cdr (assoc it *acl* :test #'string-equal)))
+       0))
+

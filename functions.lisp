@@ -96,22 +96,4 @@
 
 (defbotf help (message)
   (bot-describe message "help"))
-
-(defbotf s (message term-name entry-number regexp)
-  (with-transaction
-    (with-term (term term-name message) 
-      (bind ((clean-number (parse-integer entry-number)))
-        (with-entry (entry term clean-number message)
-          (or (ppcre:register-groups-bind (from to) ("^/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/$" regexp)
-                (bind (((:values result match-p) (ppcre:regex-replace-all from (text-of entry) to)))
-                  (if match-p 
-                      (progn 
-                        (setf (text-of entry) result)
-                        (with-irc (reply-to message 
-                                            (format nil "Replaced string in ~:R entry in term \"~A\"."
-                                                    clean-number term-name))))
-                      (with-irc (reply-to message "No replacements performed.")))
-                  t))
-              (with-irc
-                (reply-to message (format nil "Incorrect regexp.")))))))))
         
