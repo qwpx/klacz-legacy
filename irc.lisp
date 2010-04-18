@@ -111,7 +111,9 @@
   (loop for cdrs on lines 
      repeat 4
      do (privmsg (connection message) 
-                 (first (arguments message)) 
+                 (if (string= (first (arguments message)) *irc-nickname*)
+                     (source message)
+                     (first (arguments message)))
                  (car cdrs))
      finally (progn 
                (when cdrs
