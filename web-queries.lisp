@@ -15,7 +15,7 @@
 (defbotf g (message &rest term)
   (bind ((results (do-google-search term))
          (first (first results)))
-    (with-irc 
+    (within-irc 
       (reply-to message 
                 (format nil "~A  -- ~A: ~A" 
                         (cdr (assoc :unescaped-url first))
@@ -38,7 +38,7 @@
 
 
 (defbotf c (message &rest term)
-  (with-irc (reply-to message 
+  (within-irc (reply-to message 
               (format nil "~{~A~^ | ~}"
                       (do-wolfram-search term)))))
 
@@ -63,7 +63,7 @@
 
 (defbotf b (message &rest term)
   (bind ((result (first (do-bing-search term))))
-    (with-irc 
+    (within-irc 
       (reply-to message 
                 (format nil "~A -- ~A - ~A"
                         (cdr (assoc :*url result))

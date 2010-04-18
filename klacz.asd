@@ -24,12 +24,13 @@
                  :ironclad
                  :drakma
                  :cl-json
-                 :local-time)
+                 :local-time
+		 :trivial-timeout)
     :serial t
     :components ((:file "package")
                  (:file "settings")
                  (:file "database")
-		 (:file "irc")
                  (:file "functions")
-                 (:file "web-queries")))
+                 (:file "web-queries")
+		 (:file "irc")))
 
