@@ -14,9 +14,7 @@
         (connect :nickname *irc-nickname*
                  :server *irc-server*))
   (mapc (curry #'join *irc-connection*) 
-        *irc-channels*)
-  (privmsg *irc-connection* "NickServ"
-           (format nil "identify ~A" *nickserv-password*)))
+        *irc-channels*))
 
 (defun privmsg-hook (message)
   (handle-message message))
@@ -93,9 +91,16 @@
             (when (= (length args) arity)
               (values function args level))))))))
 
+(defun whitespace-char-p (char)
+  (when (member char '(#\space #\tab #\newline))
+    t))
+
+(defun trim (string)
+  (ppcre:regex-replace "^\\s*(.*?)\\s*$" string "\\1"))
+
 (defun handle-message (message)
   (with-simple-restart (continue "Continue processing IRC messages")
-    (bind ((message-line (second (arguments message)))
+    (bind ((message-line (trim (second (arguments message))))
            ((:values function args level) (find-applicable-function message-line)))
       (when (and (null function)
                  (char= (aref message-line 0) #\,))
@@ -124,7 +129,11 @@
                      (within-irc
                        (reply-to message (format nil "~A" var)))))))
           (bordeaux-threads:make-thread #'worker-function                  
-                                        :name "worker thread"))))))
+                                        :name "worker thread"
+                                        :initial-bindings (list (cons '*standard-output* 
+                                                                      *standard-output*)
+                                                                (cons '*error-output*
+                                                                      *error-output*))))))))
 
 (defmethod log-hook ((message irc-privmsg-message))
   (with-transaction 

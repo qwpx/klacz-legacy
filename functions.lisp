@@ -106,7 +106,7 @@
 
 (defbotf 8b (message &rest question)
   (declare (ignore question))
-  (within-irc (reply-to message (nth (random (length *m8b-answers*)) 
+  (within-irc (reply-to message (nth (random (length *m8b-answers*))
                                    *m8b-answers*))))
 
 (defbotf ping (message)
