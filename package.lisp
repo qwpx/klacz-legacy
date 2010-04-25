@@ -3,3 +3,6 @@
         :hu.dwim.perec :hu.dwim.def :local-time)
   (:shadowing-import-from #:hu.dwim.perec #:set #:time))
 
+(defpackage :klacz-eval 
+  (:use :common-lisp))
+

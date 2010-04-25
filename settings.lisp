@@ -13,7 +13,7 @@
 
 (defparameter *bing-appid* "565F82ECDBD0DE7B08A4C39664E9265156F7701D")
 
-(defparameter *nickserv-password-path* (merge-pathnames "/home/dodek/klacz/nickserv.secret"))
+(defparameter *nickserv-password-path* (merge-pathnames "/home/dodek/programowanie/projekty/klacz/nickserv.secret"))
 
 (defparameter *nickserv-password*
   (with-open-file (in *nickserv-password-path* :direction :input)
