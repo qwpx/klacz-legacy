@@ -7,7 +7,8 @@
 (defparameter hu.dwim.perec:*database*
   (make-instance 'database-connection
     :connection-specification
-    `(:database ,*database-name*
+    `(:host ,*database-host*
+      :database ,*database-name*
       :user-name ,*database-user*
       :password  ,*database-password*)))
 

@@ -1,5 +1,6 @@
 (in-package :klacz)
 
+(setf drakma:*drakma-default-external-format* :utf-8)
 
 (defparameter *google-api-url* 
   "http://ajax.googleapis.com/ajax/services/search/web")
@@ -11,6 +12,7 @@
     (cdr (getf 
           (car (json:decode-json in)) 
           :response-data))))
+
 
 (defbotf g (message &rest term)
   (bind ((results (do-google-search term))

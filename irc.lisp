@@ -104,6 +104,7 @@
     (bind ((message-line (trim (second (arguments message))))
            ((:values function args level) (find-applicable-function message-line)))
       (when (and (null function)
+		 (not (zerop (length message-line)))
                  (char= (aref message-line 0) #\,))
         (setf function #'bot-random-entry
               args (list (subseq message-line 1))
@@ -167,7 +168,8 @@
                    :channel ""
                    :kind 'quit
                    :nick (source message)
-                   :message (first (arguments message)))))
+                   :message (or (first (arguments message))
+				""))))
 
 (defmethod memo-hook ((message irc-privmsg-message))
   (with-transaction
@@ -226,7 +228,8 @@
 
 
 (defparameter *acl*
-  '(("Dodecki" . 9001)))
+  '(("Dodecki" . 9001)
+    ("pecet" . 10)))
 
 (defun level-of (nick)
   (or (awhen (nick-account nick)
