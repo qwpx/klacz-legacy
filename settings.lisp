@@ -21,4 +21,8 @@
 (defparameter *nickserv-password*
   (with-open-file (in *nickserv-password-path* :direction :input)
     (read-line in nil nil)))
+
+(defparameter *max-bot-lines* 4)
                                  
+(defparameter *min-topic-delay* '(1 :day))
+(defparameter *min-topic-user-delay* '(1 :day))

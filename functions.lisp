@@ -17,7 +17,7 @@
   (flet ((escape-havoq-lol (line)
            (ppcre:regex-replace "^(\\s*)\\." line "\\1\\.")))
     (loop for cdrs on lines 
-       repeat 4
+       repeat *max-bot-lines*
        do (privmsg connection 
                    target
                    (escape-havoq-lol (car cdrs)))
@@ -26,8 +26,8 @@
                    (privmsg connection
                             target
                             (format nil "But wait, there's more! (~D more, type ,more)"
-                                    (length cdrs))))
-                 (setf *message-pool* cdrs)))))
+                                    (length cdrs)))
+		   (setf *message-pool* cdrs))))))
 
 (defmethod privmsg-lines (connection target (text string))
   (bind ((lines (ppcre:split "\\n+" text)))
@@ -81,7 +81,10 @@ Used mainly for testing purposes."
 
 (defbotf more (message)
   "Prints queued output from the pool"
-  (within-irc (reply-to message *message-pool*)))
+  (let ((lines *message-pool*)) ;; needs lexical binding
+    (within-irc (reply-to message lines))
+    (when (<= (length lines) *max-bot-lines*)
+      (setf *message-pool* nil))))
 
 (defbotf debug :level 10 (message)
   "Invokes debugger"
@@ -319,3 +322,51 @@ Used mainly for testing purposes."
          (groups (mapcar (lambda (list) (format nil "~{~A~^, ~}" list))
                          (group functions 10))))
     (within-irc (reply-to message groups))))
+
+(defun join-strings (strings &optional (delimiter ""))
+  (reduce (lambda (x y) (concatenate 'string x delimiter y))
+	  strings))
+
+(defbotf topic (message &rest text)
+  "Enables user to set the part of the topic to his own message once in a while."
+  (aif (nick-account (source message))
+       (with-transaction
+       (let ((topic-change (select-instance (c topic-change)
+			     (where (equal (user-of c) it))))
+	     (last-change (select-instance (c topic-change)
+			    (order-by :descending (date-of c))
+			    (limit 1)))
+	     (time-now (now)))
+	 (cond 
+	   ((and last-change 
+		 (timestamp>= (apply #'timestamp+ (date-of last-change) 
+				     *min-topic-delay*)
+			      time-now))
+	    (let ((last-date (date-of last-change)))
+	      (within-irc 
+		(reply-to message (format nil "Not enough time has passed since last topic change (was ~A)"
+					  (format-timestring nil last-date :format *date-format*))))))
+	   ((and topic-change
+		 (timestamp>= (apply #'timestamp+ (date-of topic-change)
+				     *min-topic-user-delay*)
+			      time-now))
+	    (let ((last-date (date-of topic-change)))
+	      (within-irc 
+		(reply-to message (format nil "Not enough time has passed since ~A's last topic change (was ~A)"
+					  it
+					  (format-timestring nil last-date :format *date-format*))))))
+	   (t
+	    (let* ((channel-name (first (arguments message)))
+		   (old-topic (topic (find-channel (connection message) channel-name)))
+		   (topic-groups (ppcre:split `(:group ,*topic-delimiter*) old-topic))
+		   new-topic)
+	      (setf (last topic-groups) (list text)
+		    new-topic (join-strings topic-groups *topic-delimiter*))
+	      (within-irc (topic- (connection message) channel-name new-topic))
+	      (make-instance 'topic-change :channel channel-name :text text :user it))))))
+       (within-irc 
+	 (reply-to message (format nil "This nick is unidentified: ~A. Try ,identify." (source message))))))
+
+	      
+	      
+	    

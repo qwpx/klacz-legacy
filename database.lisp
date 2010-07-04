@@ -50,3 +50,8 @@
    (active t :type boolean)
    (message :type (text 256))))
 
+(defpclass* topic-change ()
+  ((channel :type (text 64))
+   (user :type (text 64))
+   (text :type (text 256))
+   (date (transaction-timestamp) :type timestamp)))
