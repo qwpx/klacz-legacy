@@ -87,9 +87,9 @@ Used mainly for testing purposes."
       (setf *message-pool* nil))))
 
 (defbotf debug :level 10 (message)
-  "Invokes debugger"
-  (within-irc (reply-to message "Invoked debugger"))
-  (break))
+	 "Invokes debugger"
+	 (within-irc (reply-to message "Invoked debugger"))
+	 (break))
 
 (defparameter *m8b-answers*
   '("As I see it, yes"
@@ -238,15 +238,15 @@ Used mainly for testing purposes."
 
 
 (defbotf forget :level 2 (message term-name entry-number)
-  "Removes entry from database"
-  (with-transaction
-    (with-term (term term-name message)
-      (bind ((clean-number (parse-integer entry-number)))
-        (with-entry (entry term clean-number message)
-          (setf (visible-p entry) nil)
-          (within-irc 
-            (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
-                                      clean-number term-name))))))))
+	 "Removes entry from database"
+	 (with-transaction
+	   (with-term (term term-name message)
+	     (bind ((clean-number (parse-integer entry-number)))
+	       (with-entry (entry term clean-number message)
+		 (setf (visible-p entry) nil)
+		 (within-irc 
+		   (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
+					     clean-number term-name))))))))
 
 
 (defbotf random-entry (message term-name)
@@ -267,23 +267,23 @@ Used mainly for testing purposes."
 
 
 (defbotf s :level 2 (message term-name entry-number &rest regexp)
-  "Performs regexp-replace in a given entry."
-  (with-transaction
-    (with-term (term term-name message) 
-      (bind ((clean-number (parse-integer entry-number)))
-        (with-entry (entry term clean-number message)
-          (or (ppcre:register-groups-bind (from to) ("^/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/$" regexp)
-                (bind (((:values result match-p) (ppcre:regex-replace-all from (text-of entry) to)))
-                  (if match-p 
-                      (progn 
-                        (setf (text-of entry) result)
-                        (within-irc (reply-to message 
-                                              (format nil "Replaced string in ~:R entry in term \"~A\"."
-                                                      clean-number term-name))))
-                      (within-irc (reply-to message "No replacements performed.")))
-                  t))
-              (within-irc
-                (reply-to message (format nil "Incorrect regexp.")))))))))
+	 "Performs regexp-replace in a given entry."
+	 (with-transaction
+	   (with-term (term term-name message) 
+	     (bind ((clean-number (parse-integer entry-number)))
+	       (with-entry (entry term clean-number message)
+		 (or (ppcre:register-groups-bind (from to) ("^/((?:[^/\\\\]|\\\\.)+)/((?:[^/\\\\]|\\\\.)+)/$" regexp)
+		       (bind (((:values result match-p) (ppcre:regex-replace-all from (text-of entry) to)))
+			 (if match-p 
+			     (progn 
+			       (setf (text-of entry) result)
+			       (within-irc (reply-to message 
+						     (format nil "Replaced string in ~:R entry in term \"~A\"."
+							     clean-number term-name))))
+			     (within-irc (reply-to message "No replacements performed.")))
+			 t))
+		     (within-irc
+		       (reply-to message (format nil "Incorrect regexp.")))))))))
 
 
 
@@ -331,42 +331,45 @@ Used mainly for testing purposes."
   "Enables user to set the part of the topic to his own message once in a while."
   (aif (nick-account (source message))
        (with-transaction
-       (let ((topic-change (select-instance (c topic-change)
-			     (where (equal (user-of c) it))))
-	     (last-change (select-instance (c topic-change)
-			    (order-by :descending (date-of c))
-			    (limit 1)))
-	     (time-now (now)))
-	 (cond 
-	   ((and last-change 
-		 (timestamp>= (apply #'timestamp+ (date-of last-change) 
-				     *min-topic-delay*)
-			      time-now))
-	    (let ((last-date (date-of last-change)))
-	      (within-irc 
-		(reply-to message (format nil "Not enough time has passed since last topic change (was ~A)"
-					  (format-timestring nil last-date :format *date-format*))))))
-	   ((and topic-change
-		 (timestamp>= (apply #'timestamp+ (date-of topic-change)
-				     *min-topic-user-delay*)
-			      time-now))
-	    (let ((last-date (date-of topic-change)))
-	      (within-irc 
-		(reply-to message (format nil "Not enough time has passed since ~A's last topic change (was ~A)"
-					  it
-					  (format-timestring nil last-date :format *date-format*))))))
-	   (t
-	    (let* ((channel-name (first (arguments message)))
-		   (old-topic (topic (find-channel (connection message) channel-name)))
-		   (topic-groups (ppcre:split `(:group ,*topic-delimiter*) old-topic))
-		   new-topic)
-	      (setf (last topic-groups) (list text)
-		    new-topic (join-strings topic-groups *topic-delimiter*))
-	      (within-irc (topic- (connection message) channel-name new-topic))
-	      (make-instance 'topic-change :channel channel-name :text text :user it))))))
+	 (let ((topic-change (select-instance (c topic-change)
+			       (where (equal (user-of c) it))))
+	       (last-change (first (select-instances (c topic-change)
+				     (order-by :descending (date-of c))
+				     (limit 1))))
+	       (time-now (now)))
+	   (cond 
+	     ((and last-change 
+		   (timestamp>= (apply #'timestamp+ (date-of last-change) 
+				       *min-topic-delay*)
+				time-now))
+	      (let ((last-date (date-of last-change)))
+		(within-irc 
+		  (reply-to message (format nil "Not enough time has passed since last topic change (was ~A)"
+					    (format-timestring nil last-date :format *date-format*))))))
+	     ((and topic-change
+		   (timestamp>= (apply #'timestamp+ (date-of topic-change)
+				       *min-topic-user-delay*)
+				time-now))
+	      (let ((last-date (date-of topic-change)))
+		(within-irc 
+		  (reply-to message (format nil "Not enough time has passed since ~A's last topic change (was ~A)"
+					    it
+					    (format-timestring nil last-date :format *date-format*))))))
+	     ((ppcre:scan `(:group ,*topic-delimiter*) text)
+	      (within-irc
+		(reply-to message (format nil "New topic contains topic delimiter (\"~A\")" *topic-delimiter*))))
+	     (t
+	      (let* ((channel-name (first (arguments message)))
+		     (old-topic (topic (find-channel (connection message) channel-name)))
+		     (topic-groups (ppcre:split `(:group ,*topic-delimiter*) old-topic))
+		     new-topic)
+		(setf (nth (1- (length topic-groups)) topic-groups) (concatenate 'string " " text)
+		      new-topic (join-strings topic-groups *topic-delimiter*))
+		(within-irc #+nil(topic- (connection message) channel-name new-topic)
+			    #-nil(reply-to message new-topic))
+		(make-instance 'topic-change :channel channel-name :text text :user it))))))
        (within-irc 
 	 (reply-to message (format nil "This nick is unidentified: ~A. Try ,identify." (source message))))))
 
-	      
-	      
-	    
+
+
