@@ -40,9 +40,8 @@
 
 
 (defbotf c (message &rest term)
-  (within-irc (reply-to message 
-              (format nil "~{~A~^ | ~}"
-                      (do-wolfram-search term)))))
+  (let ((results (do-wolfram-search term)))
+    (within-irc (reply-to message (format nil "~{~A~^ | ~}" results)))))
 
 (defparameter *bing-api-url*
   "http://api.search.live.net/json.aspx")

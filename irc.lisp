@@ -9,10 +9,15 @@
 (defparameter *irc-reader-thread* nil)
 (defparameter *irc-writer-thread* nil)
 
+(defun nickserv-identify ()
+  (privmsg *irc-connection* "NickServ" 
+	   (format nil "identify ~A" *nickserv-password*)))
+
 (defun init-connection ()
   (setf *irc-connection*
         (connect :nickname *irc-nickname*
                  :server *irc-server*))
+  (nickserv-identify)
   (mapc (curry #'join *irc-connection*) 
         *irc-channels*))
 
@@ -41,9 +46,9 @@
               for f = (chanl:recv *channel*)
               do (funcall f))))
     (setf *end-connection* nil)
-    (init-connection)
     (when shuffle-hooks-p
       (shuffle-hooks))
+    (init-connection)
     (setf *irc-reader-thread*
           (bordeaux-threads:make-thread #'reader-loop 
                                         :name "irc reader thread"
@@ -213,9 +218,11 @@
   (within-irc (whois *irc-connection* nick)))
 
 (defbotf identify (message)
+  "Identifies a user"
     (identify-nick (source message)))
 
 (defbotf identified-p (message)
+  "Checks if a user is identified and returns the name of related account."
     (bind (((:values account found-p) (gethash (source message) *identified-db*)))
       (within-irc 
         (reply-to message
@@ -226,10 +233,6 @@
 (defun nick-account (nick)
   (gethash nick *identified-db*))
 
-
-(defparameter *acl*
-  '(("Dodecki" . 9001)
-    ("pecet" . 10)))
 
 (defun level-of (nick)
   (or (awhen (nick-account nick)

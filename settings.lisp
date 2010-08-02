@@ -22,9 +22,22 @@
   (with-open-file (in *nickserv-password-path* :direction :input)
     (read-line in nil nil)))
 
+(defparameter *acl*
+  '(("Dodecki" . 9001)
+    ("pecet" . 10)
+    ("mgorny" . 10)
+    ("BasementCat" . 5)
+    ("klausa" . 5)))
+
+
 (defparameter *max-bot-lines* 4)
                                  
 (defparameter *min-topic-delay* '(1 :hour))
 (defparameter *min-topic-user-delay* '(2 :day))
 
 (defparameter *topic-delimiter* "|")
+
+
+(defparameter *idlekick-time* '(24 :hour))
+(defparameter *idlekick-exempts* '("klacz" "havoq" "pagenoare"))
+(defparameter *idlekick-channels* '("#qwpx"))

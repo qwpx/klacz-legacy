@@ -167,7 +167,7 @@ Used mainly for testing purposes."
                    :to nick
                    :message text))
   (within-irc 
-    (reply-to message (format nil "Added memo for \"~A\"." nick))))
+    (reply-to message (format nil "Added memo for ~S." nick))))
 
 (defbotf time (message)
   "Prints current time."
@@ -186,20 +186,23 @@ Used mainly for testing purposes."
       (unless term
         (setf term (make-instance 'term :name term-name))
         (within-irc 
-          (reply-to message (format nil "Created term \"~A\"." term-name))))
+          (reply-to message (format nil "Created term ~S." term-name))))
       (make-instance 'entry
                      :text text
                      :visible t
                      :term term
                      :added-by (source message))
+      (unless (visible-p term) 
+	(setf (visible-p term) t))
       (within-irc 
-        (reply-to message (format nil "Added one entry to term \"~A\"." 
+        (reply-to message (format nil "Added one entry to term ~S." 
                                   term-name))))))
 (defmacro with-term ((var-name term-name message) &body body)
-  `(bind ((,var-name (select-instance (t term)
-                       (where (like (name-of t) ,term-name :case-sensitive-p nil)))))
+  `(bind ((,var-name (select-instance (term term)
+                       (where (and (visible-p term) 
+				   (like (name-of term) ,term-name :case-sensitive-p nil))))))
      (if (null ,var-name)
-         (within-irc (reply-to ,message (format nil "Term \"~A\" not found." ,term-name)))
+         (within-irc (reply-to ,message (format nil "Term ~S not found." ,term-name)))
          (progn 
            ,@body))))
 
@@ -208,7 +211,7 @@ Used mainly for testing purposes."
   (with-transaction 
     (with-term (term term-name message)
       (bind ((n 0)
-             (lines (list* (format nil "I heard \"~A\" is:" term-name)
+             (lines (list* (format nil "I heard ~S is:" term-name)
                            (mapcar (lambda (entry)
                                      (prog1
                                          (format nil "[~D] ~A" n (text-of entry))
@@ -233,7 +236,7 @@ Used mainly for testing purposes."
        (if ,var
            (progn 
              ,@body)
-           (within-irc (reply-to ,message (format nil "No such entry in term \"~A\"."
+           (within-irc (reply-to ,message (format nil "No such entry in term ~S."
                                                   ,term-name)))))))
 
 
@@ -245,8 +248,13 @@ Used mainly for testing purposes."
 	       (with-entry (entry term clean-number message)
 		 (setf (visible-p entry) nil)
 		 (within-irc 
-		   (reply-to message (format nil "Forgot ~:R entry of term \"~A\"." 
-					     clean-number term-name))))))))
+		   (reply-to message (format nil "Forgot ~:R entry of term ~S." 
+					     clean-number term-name)))
+		 (when (zerop (first (select ((count e)) (from (e entry)) 
+					     (where (and (equal (term-of e) term)
+							 (visible-p e))))))
+		   (setf (visible-p term) nil)
+		   (reply-to message (format nil "Forgot term ~S." term-name))))))))
 
 
 (defbotf random-entry (message term-name)
@@ -278,7 +286,7 @@ Used mainly for testing purposes."
 			     (progn 
 			       (setf (text-of entry) result)
 			       (within-irc (reply-to message 
-						     (format nil "Replaced string in ~:R entry in term \"~A\"."
+						     (format nil "Replaced string in ~:R entry in term ~S."
 							     clean-number term-name))))
 			     (within-irc (reply-to message "No replacements performed.")))
 			 t))
@@ -291,11 +299,14 @@ Used mainly for testing purposes."
 
 (defbotf eval :level 10 (message &rest code)
          "Evaluates given form and returns the result, along with its type."
-         (bind ((result (let ((*package* (find-package :klacz-eval)))
+         (bind ((out (make-string-output-stream))
+		(result (let ((*package* (find-package :klacz-eval))
+			      (*standard-output* out)
+			      (*error-output* out))
                           (eval (read-from-string code)))))
            (within-irc
              (reply-to message 
-                       (format nil "~S => ~A" result (type-of result))))))
+                       (format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
 
 
 (defbotf describe-function (message function-name)
@@ -331,8 +342,8 @@ Used mainly for testing purposes."
   "Enables user to set the part of the topic to his own message once in a while."
   (aif (nick-account (source message))
        (with-transaction
-	 (let ((topic-change (select-instance (c topic-change)
-			       (where (equal (user-of c) it))))
+	 (let ((topic-change (first (select-instances (c topic-change)
+				      (where (equal (user-of c) it)))))
 	       (last-change (first (select-instances (c topic-change)
 				     (order-by :descending (date-of c))
 				     (limit 1))))
@@ -357,7 +368,7 @@ Used mainly for testing purposes."
 					    (format-timestring nil last-date :format *date-format*))))))
 	     ((ppcre:scan `(:group ,*topic-delimiter*) text)
 	      (within-irc
-		(reply-to message (format nil "New topic contains topic delimiter (\"~A\")" *topic-delimiter*))))
+		(reply-to message (format nil "New topic contains topic delimiter (~S)" *topic-delimiter*))))
 	     (t
 	      (let* ((channel-name (first (arguments message)))
 		     (old-topic (topic (find-channel (connection message) channel-name)))
@@ -365,11 +376,132 @@ Used mainly for testing purposes."
 		     new-topic)
 		(setf (nth (1- (length topic-groups)) topic-groups) (concatenate 'string " " text)
 		      new-topic (join-strings topic-groups *topic-delimiter*))
-		(within-irc #+nil(topic- (connection message) channel-name new-topic)
-			    #-nil(reply-to message new-topic))
+		(within-irc #-nil(topic- (connection message) channel-name new-topic)
+			    #+nil(reply-to message new-topic))
 		(make-instance 'topic-change :channel channel-name :text text :user it))))))
        (within-irc 
 	 (reply-to message (format nil "This nick is unidentified: ~A. Try ,identify." (source message))))))
 
+(let ((n 6))
+  (defbotf sru (message)
+    "Russian roulette, kicks a user with a chance one in six, otherwise prints some silly string."
+    (if (zerop (random n))
+	(progn 
+	  (setf n 6)
+	  (within-irc (kick *irc-connection* (first (arguments message)) (source message) 
+			    "sru")))
+	(progn 
+	  (decf n 1)
+	  (within-irc (reply-to message "You were lucky this time."))))))
+
+(defbotf rpg-stats (message &rest nick)
+  "Prints RPG stats of a given nick."
+  (let* ((nick (if (string/= nick "") 
+		   nick 
+		   (source message)))
+	 (stats (with-transaction
+		  (select ((nick-of l) (count l)) 
+			  (from (l log-entry)) 
+			  (where (and
+				  (not (equal nick (nick-of l)))
+				  (not (equal "havoq" (nick-of l)))
+				  (re-like (message-of l) (format nil ".*~A.*(\\+1|\\+\\+).*" nick) 
+					  :case-sensitive-p nil)))
+			  (group-by (nick-of l)))))
+	 (stats-string (format nil "~D points (~{~{~A - ~D~}~^, ~})" 
+			       (loop for stat in stats sum (second stat))
+			       (sort stats #'> :key #'second))))
+    (if (null stats)
+	(within-irc (reply-to message "0 points, so sad."))
+	(within-irc (reply-to message stats-string)))))
+	
 
 
+(defbotf kick :level 5 (message nick &rest reason)
+  "Kicks a user with a given reason"
+  (kick *irc-connection* (first (arguments message)) nick reason))
+
+(defbotf create-poll (message name vote-limit &rest question)
+  "Creates a poll with a given question and a vote limit."
+  (with-transaction 
+    (let ((vote-limit (parse-integer vote-limit :junk-allowed t)))
+      (cond
+	((select-instance (p poll) 
+	   (where (equal name (name-of p))))
+	 (within-irc (reply-to message
+			       "Poll with a given name already exists.")))
+	((or (not vote-limit) (not (plusp vote-limit)))
+	 (within-irc (reply-to message
+			       "Could not parse the vote limit.")))
+	((null (nick-account (source message)))
+	 (within-irc (reply-to message
+			       "Your nick is not identified (try ,identify)")))
+	(t (make-instance 'poll 
+			  :name name 
+			  :vote-limit vote-limit
+			  :user (nick-account (source message))
+			  :question question)
+	   (within-irc (reply-to message		
+				 (format nil "Poll ~A created." name))))))))
+
+(defbotf describe-poll (message name)
+  "Prints poll info: name, question and votes."
+  (with-transaction
+    (let ((poll (select-instance (p poll)
+		  (where (equal name (name-of p))))))
+      (if poll
+	  (let* ((votes (mapcar #'user-of (votes-of poll)))
+		 (poll-info (format nil "Poll ~A - ~S: votes ~D/~D (~
+                                         ~{~A~^, ~})" 
+				    (name-of poll)
+				    (question-of poll)
+				    (length votes)
+				    (vote-limit-of poll)
+				    votes)))
+	    (within-irc (reply-to message poll-info)))
+	  (within-irc (reply-to message 
+				(format nil "No such poll: ~A" name)))))))
+
+(defbotf vote (message name)
+  "Votes for a given poll."
+  (with-transaction
+    (let ((poll (select-instance (p poll)
+		  (where (equal name (name-of p)))))
+	  (account (nick-account (source message))))
+      (cond
+	((null poll) 
+	 (within-irc (reply-to message 
+			       (format nil "There is no such poll: ~A." 
+				       name))))
+	((null account)
+	 (within-irc (reply-to message 
+			       "You're not identified (try ,identify)")))
+	((select-instance (v vote) 
+	   (where (and (equal (poll-of v) poll)
+		       (equal (user-of v) account))))
+	 (within-irc (reply-to message
+			       "You already voted in this poll.")))
+	((not (active-p poll))
+	 (within-irc (reply-to message
+			       "The poll has already ended.")))
+	(t
+	 (when (= (1+ (length (votes-of poll))) (vote-limit-of poll))
+	   (setf (active-p poll) nil))
+	 (make-instance 'vote :poll poll :user account)
+	 (within-irc (reply-to message "Vote accepted.")))))))
+
+(defbotf active-polls (message)
+  (with-transaction 
+    (let* ((polls (select-instances (p poll)
+		    (where (active-p p))))
+	   (lists (mapcar (lambda (names) (format nil "~{~A~^, ~}" names))
+			  (group (mapcar #'name-of polls) 10))))
+      (within-irc 
+	(reply-to message "Active polls:")
+	(reply-to message lists)))))
+      
+	   
+       
+
+	
+     

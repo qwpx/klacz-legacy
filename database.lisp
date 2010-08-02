@@ -22,7 +22,8 @@
 
 
 (defpclass* term ()
-  ((name :type (text 128) :unique t)))
+  ((name :type (text 128) :unique t)
+   (visible t :type boolean)))
 
 (defpclass* entry () 
   ((text :type (text 256))
@@ -55,3 +56,20 @@
    (user :type (text 64))
    (text :type (text 256))
    (date (transaction-timestamp) :type timestamp)))
+
+(defpclass* poll ()
+  ((name :type (text 256))
+   (question :type (text 256))
+   (user :type (text 64))
+   (date (transaction-timestamp) :type timestamp)
+   (active t :type boolean)
+   (vote-limit :type integer)))
+
+(defpclass* vote ()
+  ((user :type (text 64))
+   (date (transaction-timestamp) :type timestamp)))
+
+(def persistent-association*
+    ((:class poll :slot votes :type (set vote))
+     (:class vote :slot poll :type poll)))
+   
