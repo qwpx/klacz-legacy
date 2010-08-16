@@ -2,6 +2,9 @@
 
 (setf drakma:*drakma-default-external-format* :utf-8)
 
+(defun strip-tags (string)
+  (ppcre:regex-replace-all "<.*?>" string ""))
+
 (defparameter *google-api-url* 
   "http://ajax.googleapis.com/ajax/services/search/web")
 
@@ -22,7 +25,7 @@
                 (format nil "~A  -- ~A: ~A" 
                         (cdr (assoc :unescaped-url first))
                         (cdr (assoc :title-no-formatting first))
-                        (cdr (assoc :content first)))))))
+                        (strip-tags (cdr (assoc :content first))))))))
 
 
 (defparameter *wolfram-api-url*
