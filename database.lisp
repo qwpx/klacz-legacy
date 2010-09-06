@@ -73,3 +73,9 @@
     ((:class poll :slot votes :type (set vote))
      (:class vote :slot poll :type poll)))
    
+(defpclass* link ()
+  ((user :type (text 64))
+   (channel :type (text 64))
+   (date (transaction-timestamp) :type timestamp)
+   (link :type (text 256) :unique t)
+   (post-count 1 :type integer)))

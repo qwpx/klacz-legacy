@@ -1,7 +1,5 @@
 (in-package :klacz)
 
-(defparameter *irc-connection* nil
-  "IRC connection")
 
 
 (defparameter *end-connection* nil)
@@ -9,11 +7,15 @@
 (defparameter *irc-reader-thread* nil)
 (defparameter *irc-writer-thread* nil)
 
+(defparameter *identified-db* (make-hash-table :test #'equal))
+
+
 (defun nickserv-identify ()
   (privmsg *irc-connection* "NickServ" 
 	   (format nil "identify ~A" *nickserv-password*)))
 
 (defun init-connection ()
+  (clrhash *identified-db*)
   (setf *irc-connection*
         (connect :nickname *irc-nickname*
                  :server *irc-server*))
@@ -27,6 +29,7 @@
 (defun shuffle-hooks ()
   (add-hook *irc-connection* 'irc-privmsg-message #'privmsg-hook)
   (add-hook *irc-connection* 'irc-privmsg-message #'memo-hook)
+  (add-hook *irc-connection* 'irc-privmsg-message #'link-hook)
   (add-hook *irc-connection* 'irc-privmsg-message #'log-hook)
   (add-hook *irc-connection* 'irc-join-message #'log-hook)
   (add-hook *irc-connection* 'irc-part-message #'log-hook)
@@ -46,9 +49,9 @@
               for f = (chanl:recv *channel*)
               do (funcall f))))
     (setf *end-connection* nil)
+    (init-connection)
     (when shuffle-hooks-p
       (shuffle-hooks))
-    (init-connection)
     (setf *irc-reader-thread*
           (bordeaux-threads:make-thread #'reader-loop 
                                         :name "irc reader thread"
@@ -121,26 +124,44 @@
                                       (level-of (source message)) level)))
           (return-from handle-message nil))
         (flet ((worker-function ()
-                 (handler-case 
-                     (trivial-timeout:with-timeout (10)
-		       (apply function (cons message args)))
-		   (trivial-timeout:timeout-error (var)
-		     (declare (ignore var))
-		     (reply-to message "Timeout has occured"))
-                   (error (var) 
-                     (within-irc
-                       (reply-to message 
-                                 (format nil "An error has been encountered: ~A" 
-                                         var))))
-                   (warning (var) 
-                     (within-irc
-                       (reply-to message (format nil "~A" var)))))))
+                 (handler-bind 
+		     ((error (lambda (var) 
+			      (within-irc
+				(reply-to message 
+					  (format nil "At ~A, a ~S has been encountered: ~A" 
+						  (format-timestring nil (now) :format *date-format*)
+						  (class-name (class-of var))
+						  var)))
+			      (return-from worker-function nil)))
+		      (warning #'muffle-warning))
+		   (trivial-timeout:with-timeout (10)
+		       (apply function (cons message args))))))
           (bordeaux-threads:make-thread #'worker-function                  
                                         :name "worker thread"
                                         :initial-bindings (list (cons '*standard-output* 
                                                                       *standard-output*)
                                                                 (cons '*error-output*
                                                                       *error-output*))))))))
+(defparameter *link-regexp* (ppcre:create-scanner "(\\w+://.*?)( |$)"))
+
+(defmethod link-hook ((message irc-privmsg-message))
+  (ppcre:register-groups-bind (link-text) (*link-regexp* (second (arguments message)))
+    (with-transaction 
+      (aif (select-instance (l link)
+	     (where (eq (link-of l) link-text)))
+	   (let ((author (user-of it))
+		 (date (format-timestring nil (date-of it) :format *date-format*))
+		 (post-count (post-count-of it)))
+	     (incf (post-count-of it))
+	     (within-irc 
+	       (notice *irc-connection* (author-of message)
+		       (format nil "That link has already been posted ~D time~:P (originally by ~A at ~A)"
+			       post-count author date))))			      
+	   (make-instance 'link
+			  :channel (first (arguments message))
+			  :user (source message)
+			  :link link-text)))))
+
 
 (defmethod log-hook ((message irc-privmsg-message))
   (with-transaction 
@@ -199,7 +220,6 @@
 
 
 
-(defparameter *identified-db* (make-hash-table :test #'equal))
 
 (defmethod unidentify-hook (message)
   (remhash (source message) *identified-db*))
@@ -227,7 +247,10 @@
       (within-irc 
         (reply-to message
                   (if found-p
-                      (format nil "~A is logged in as ~A" (source message) account)
+                      (format nil "~A is logged in as ~A (level ~D)" 
+			      (source message) 
+			      account 
+			      (level-of (source message)))
                       (format nil "~A is not logged in" (source message)))))))
 
 (defun nick-account (nick)

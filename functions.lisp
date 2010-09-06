@@ -1,5 +1,8 @@
 (in-package :klacz)
 
+(defparameter *irc-connection* nil
+  "IRC connection")
+
 (defparameter *channel* (make-instance 'chanl:unbounded-channel))
 (defmacro within-irc (&body body)
   `(chanl:send *channel* 
@@ -144,7 +147,7 @@ Used mainly for testing purposes."
   (with-transaction
     (bind ((last-entry (first (select-instances (l log-entry)
                                 (where (and (eq (channel-of l) (first (arguments message)))
-                                            (re-like (nick-of l) nick :case-sensitive-p nil)))
+                                            (like (nick-of l) nick :case-sensitive-p nil)))
                                 (order-by :descending (date-of l))
                                 (limit 1))))
            (reply (if last-entry
@@ -255,6 +258,16 @@ Used mainly for testing purposes."
 							 (visible-p e))))))
 		   (setf (visible-p term) nil)
 		   (reply-to message (format nil "Forgot term ~S." term-name))))))))
+
+(defbotf show-entry (message term-name entry-number)
+  "Prints n-th entry of the given term."
+  (with-transaction
+    (with-term (term term-name message)
+      (bind ((clean-number (parse-integer entry-number)))
+	(with-entry (entry term clean-number message)
+	  (bind ((text (text-of entry)))
+	    (within-irc 
+	      (reply-to message (format nil "[~D] ~A" clean-number text)))))))))
 
 
 (defbotf random-entry (message term-name)
@@ -421,6 +434,10 @@ Used mainly for testing purposes."
   "Kicks a user with a given reason"
   (kick *irc-connection* (first (arguments message)) nick reason))
 
+(defbotf op :level 11 (message nick)
+  "Gives the operator privileges to a user."
+  (op *irc-connection* (first (arguments message)) nick))
+
 (defbotf create-poll (message name vote-limit &rest question)
   "Creates a poll with a given question and a vote limit."
   (with-transaction 
@@ -500,7 +517,11 @@ Used mainly for testing purposes."
 	(reply-to message "Active polls:")
 	(reply-to message lists)))))
       
-	   
+(defbotf print-base (message base number)
+  (let* ((*print-base* (parse-integer base))
+	 (number (princ-to-string (parse-integer number))))
+    (within-irc 
+      (reply-to message number))))
        
 
 	

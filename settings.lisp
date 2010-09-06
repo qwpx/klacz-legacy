@@ -4,7 +4,7 @@
 (defparameter *irc-server* "irc.freenode.net")
 (defparameter *irc-channels* '("#xyzzytest" "#qwpx"))
 
-(setf iolib.sockets:*ipv6* nil)
+#+nil (setf iolib.sockets:*ipv6* nil)
 
 (defparameter *database-host* "localhost")
 (defparameter *database-name* "klacz")
@@ -24,10 +24,10 @@
 
 (defparameter *acl*
   '(("Dodecki" . 9001)
-    ("pecet" . 10)
+    ("stamp" . 10)
     ("mgorny" . 10)
     ("BasementCat" . 5)
-    ("klausa" . 5)))
+    ("klausa" . 10)))
 
 
 (defparameter *max-bot-lines* 4)
