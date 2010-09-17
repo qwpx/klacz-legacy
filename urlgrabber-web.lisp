@@ -77,5 +77,19 @@
            (limit count)
            (offset offset)))
 
-(define-links-page (random "/random")
-    )
+(define-links-page (random-link "/random")
+    ()
+  :query (select-instances (l link)
+           (limit 1)
+           (offset (random (count-instances 'link)))))
+
+(hunchentoot:define-easy-handler (main-page :uri "/")
+    ()
+  (with-page-layout 
+    (with-html-output (*standard-output* nil :indent t)
+      (:p "I GOT SUM LINKZ:")
+      (:ul
+       (:li (:a :href "/newest" "HOT STUFF"))
+       (:li (:a :href "/top" "TOP STUFF"))
+       (:li (:a :href "/user?nick=Dodek" "MY STUFF"))
+       (:li (:a :href "/random" "SO RANDOM STUFF"))))))
