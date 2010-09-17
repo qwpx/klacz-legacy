@@ -23,7 +23,10 @@
     (read-line in nil nil)))
 
 (defparameter *acl*
-  '(("Dodecki" . 9001)
+  '(("katafrakt" . 10)
+    ("x3nU" . 10)
+    ("Emde" . 5)
+    ("Dodecki" . 9001)
     ("stamp" . 10)
     ("mgorny" . 10)
     ("BasementCat" . 5)

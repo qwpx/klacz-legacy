@@ -25,12 +25,15 @@
                  :drakma
                  :cl-json
                  :local-time
-		 :trivial-timeout)
+		 :trivial-timeout
+                 :hunchentoot
+                 :cl-who)
     :serial t
     :components ((:file "package")
                  (:file "settings")
                  (:file "database")
                  (:file "functions")
                  (:file "web-queries")
-		 (:file "irc")))
+		 (:file "irc")
+                 (:file "urlgrabber-web")))
 
