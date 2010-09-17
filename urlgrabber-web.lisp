@@ -15,8 +15,10 @@
      (loop for link in links
         do (with-slots (user channel date link post-count) link
              (htm
-              (:tr (:td (fmt "~A" user))
-                   (:td (fmt "~A" channel))
+              (:tr (:td (:a :href (format nil "/user?nick=~A" user)
+                            (fmt "~A" user)))
+                   (:td (:a :href (format nil "/channel?channel=~A" (remove #\# channel))
+                            (fmt "~A" channel)))
                    (:td (:a :href link (fmt "~A" link)))
                    (:td (fmt "~A" (format-timestring nil date :format *date-format*)))
                    (:td (fmt "~D" post-count)))))))
@@ -51,9 +53,9 @@
                                parameters
                                `(list
                                  ,@(loop for item in lambda-list
-                                    for symbol = (if (symbolp item) item (car item))
-                                     append (list (intern (string symbol) :keyword)
-                                                  symbol)))))))))))
+                                      for symbol = (if (symbolp item) item (car item))
+                                      append (list (intern (string symbol) :keyword)
+                                                   symbol)))))))))))
 
 (define-links-page (newest-links "/newest")
     ()
@@ -68,7 +70,7 @@
            (where (equal (user-of l) nick))
            (order-by :descending (date-of l))
            (limit count)
-          (offset offset)))
+           (offset offset)))
 
 (define-links-page (top-links "/top")
     ()
@@ -83,6 +85,13 @@
            (limit 1)
            (offset (random (count-instances 'link)))))
 
+(define-links-page (channel-links "/channel")
+    (channel)
+  :query (select-instances (l link)
+           (where (equal (channel-of l) (format nil "#~A" channel)))
+           (limit count)
+           (offset offset)))
+
 (hunchentoot:define-easy-handler (main-page :uri "/")
     ()
   (with-page-layout 
@@ -92,4 +101,5 @@
        (:li (:a :href "/newest" "HOT STUFF"))
        (:li (:a :href "/top" "TOP STUFF"))
        (:li (:a :href "/user?nick=Dodek" "MY STUFF"))
+       (:li (:a :href "/channel?channel=qwpx" "OUR STUFF"))
        (:li (:a :href "/random" "SO RANDOM STUFF"))))))
