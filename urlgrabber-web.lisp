@@ -1,15 +1,26 @@
 (in-package :klacz)
 
+(defvar *acceptor*)
+
+(defvar *http-output*)
+
+(defun start-web-server ()
+  (setf *acceptor* (make-instance 'hunchentoot:acceptor :port 4242))
+  (hunchentoot:start *acceptor*))
+
+(defun stop-web-server ()
+  (hunchentoot:stop *acceptor*))
+
 (defmacro with-page-layout (&body body)
-  `(with-output-to-string (*standard-output*)
-     (with-html-output (*standard-output* nil :prologue t :indent t)
+  `(with-output-to-string (*http-output*)
+     (with-html-output (*http-output* nil :prologue t :indent t)
        (:html
         (:head (:title "LOL URLS EVERYWHERE"))
         (:body 
          ,@body)))))
 
 (defun print-links (links uri count offset parameters)
-  (with-html-output (*standard-output* nil :indent t)
+  (with-html-output (*http-output* nil :indent t)
     (:table 
      (:tr (:th "User") (:th "Channel") (:th "Link") (:th "Date") (:th "Post count"))
      (loop for link in links
@@ -92,14 +103,24 @@
            (limit count)
            (offset offset)))
 
+(define-links-page (search-links "/search")
+    (q)
+  :query (select-instances (l link)
+	   (where (re-like (link-of l) q :case-sensitive-p nil))
+	   (limit count)
+	   (offset offset))
+  :sanity-checks ((stringp q)))
+
 (hunchentoot:define-easy-handler (main-page :uri "/")
     ()
   (with-page-layout 
-    (with-html-output (*standard-output* nil :indent t)
+    (with-html-output (*http-output* nil :indent t)
       (:p "I GOT SUM LINKZ:")
       (:ul
        (:li (:a :href "/newest" "HOT STUFF"))
        (:li (:a :href "/top" "TOP STUFF"))
        (:li (:a :href "/user?nick=Dodek" "MY STUFF"))
        (:li (:a :href "/channel?channel=qwpx" "OUR STUFF"))
+       (:li (:a :href "/search?q=.*google.*" "GOOGLE STUFF"))
        (:li (:a :href "/random" "SO RANDOM STUFF"))))))
+

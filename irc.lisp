@@ -31,6 +31,7 @@
   (add-hook *irc-connection* 'irc-privmsg-message #'memo-hook)
   (add-hook *irc-connection* 'irc-privmsg-message #'link-hook)
   (add-hook *irc-connection* 'irc-privmsg-message #'log-hook)
+  (add-hook *irc-connection* 'irc-rpl_endofnames-message #'identify-names-hook)
   (add-hook *irc-connection* 'irc-join-message #'log-hook)
   (add-hook *irc-connection* 'irc-part-message #'log-hook)
   (add-hook *irc-connection* 'irc-quit-message #'log-hook)
@@ -42,8 +43,8 @@
 
 (defun start-connection (&key (shuffle-hooks-p t))
   (flet ((reader-loop ()
-           (loop until *end-connection*
-              while (read-message *irc-connection*)))
+           (loop for message =  (read-message *irc-connection*)
+		while message))
          (writer-loop ()
            (loop until *end-connection*
               for f = (chanl:recv *channel*)
@@ -53,27 +54,28 @@
     (when shuffle-hooks-p
       (shuffle-hooks))
     (setf *irc-reader-thread*
-          (bordeaux-threads:make-thread #'reader-loop 
-                                        :name "irc reader thread"
-                                        :initial-bindings (list (cons '*standard-output* 
-                                                                      *standard-output*)
-                                                                (cons '*error-output*
-                                                                      *error-output*)))
+          (bordeaux-threads:make-thread 
+	   #'reader-loop 
+	   :name "irc reader thread"
+	   :initial-bindings (list (cons '*standard-output* 
+					 *standard-output*)
+				   (cons '*error-output*
+					 *error-output*)))
           *irc-writer-thread* 
-          (bordeaux-threads:make-thread #'writer-loop 
-                                        :name "irc writer thread"
-                                        :initial-bindings (list (cons '*standard-output* 
-                                                                      *standard-output*)
-                                                                (cons '*error-output*
-                                                                      *error-output*))))
+          (bordeaux-threads:make-thread 
+	   #'writer-loop 
+	   :name "irc writer thread"
+	   :initial-bindings (list (cons '*standard-output* 
+					 *standard-output*)
+				   (cons '*error-output*
+					 *error-output*))))
     t))
 
 (defun end-connection ()
-  (setf *end-connection* t)
+  (quit *irc-connection*)
   (chanl:send *channel* (lambda ()))
   (bordeaux-threads:join-thread *irc-reader-thread*)
-  (bordeaux-threads:join-thread *irc-writer-thread*)
-  (quit *irc-connection*))
+  (bordeaux-threads:join-thread *irc-writer-thread*))
 
 (defun parse-message-line (line)
   (bind ((result (ppcre:split "\\s+" line :limit 2)))
@@ -235,11 +237,16 @@
   (identify-nick (source message)))
 
 (defun identify-nick (nick)
-  (within-irc (whois *irc-connection* nick)))
+  (whois *irc-connection* nick))
+
+(defmethod identify-names-hook ((message irc-rpl_endofnames-message))
+  )
+
 
 (defbotf identify (message)
   "Identifies a user"
-    (identify-nick (source message)))
+ (within-irc
+   (identify-nick (source message))))
 
 (defbotf identified-p (message)
   "Checks if a user is identified and returns the name of related account."

@@ -309,17 +309,24 @@ Used mainly for testing purposes."
 
 
 
+(defun eval-in-package (message code package)
+  (bind ((out (make-string-output-stream))
+	 (result (let ((*standard-output* out)
+		       (*error-output* out)
+		       (*package* package))
+		   (eval (read-from-string code)))))
+    (within-irc
+      (reply-to message 
+		(format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
+
 
 (defbotf eval :level 10 (message &rest code)
-         "Evaluates given form and returns the result, along with its type."
-         (bind ((out (make-string-output-stream))
-		(result (let ((*package* (find-package :klacz-eval))
-			      (*standard-output* out)
-			      (*error-output* out))
-                          (eval (read-from-string code)))))
-           (within-irc
-             (reply-to message 
-                       (format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
+  "Evaluates given form and returns the result, along with its type."
+  (eval-in-package message code (find-package :klacz-eval)))
+
+(defbotf eval-klacz :level 10 (message &rest code)
+  "Same as `eval', but in :klacz package"
+  (eval-in-package message code (find-package :klacz)))
 
 
 (defbotf describe-function (message function-name)
