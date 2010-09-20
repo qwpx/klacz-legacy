@@ -12,28 +12,22 @@
     :licence "GNU GPL v3"
     :description "Klacz IRC bot."
     :properties ((#:author-email . "dodek@dodecki.net"))
-    :depends-on (:cl-irc 
-                 :cl-ppcre
-                 :metabang-bind 
-                 :anaphora 
-                 :bordeaux-threads
-                 :alexandria
-                 :hu.dwim.perec
-                 :hu.dwim.perec.postgresql
-                 :chanl
-                 :ironclad
-                 :drakma
-                 :cl-json
-                 :local-time
-		 :trivial-timeout
-                 :hunchentoot
-                 :cl-who)
+    :depends-on (:cl-irc :bordeaux-threads :drakma :hunchentoot
+                 :cl-ppcre :cl-json
+                 :metabang-bind :anaphora :alexandria 
+		 :hu.dwim.defclass-star+hu.dwim.def :closer-mop
+                 :chanl :trivial-timeout
+                 :ironclad :cl-who :local-time 
+                 :cl-prevalence)
     :serial t
     :components ((:file "package")
                  (:file "settings")
-                 (:file "database")
-                 (:file "functions")
-                 (:file "web-queries")
+		 (:file "utils")
+		 (:file "reactor")
 		 (:file "irc")
-                 (:file "urlgrabber-web")))
+                 (:file "database")
+                 #+nil(:file "functions")
+                 #+nil(:file "web-queries")
+		 #+nil(:file "irc")
+                 #+nil(:file "urlgrabber-web")))
 

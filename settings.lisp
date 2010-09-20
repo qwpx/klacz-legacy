@@ -6,17 +6,14 @@
 
 #+nil (setf iolib.sockets:*ipv6* nil)
 
-(defparameter *database-host* "localhost")
-(defparameter *database-name* "klacz")
-(defparameter *database-user* "klacz")
-(defparameter *database-password* "klacz")
+(defparameter *database-directory* "database/")
 
 (defparameter *date-format*
   `((:day 2) #\. (:month 2) #\. (:year 4) #\space (:hour 2) #\: (:min 2) #\: (:sec 2) #\space :timezone))
 
 (defparameter *bing-appid* "565F82ECDBD0DE7B08A4C39664E9265156F7701D")
 
-(defparameter *nickserv-password-path* (merge-pathnames "/home/dodek/klacz/nickserv.secret"))
+(defparameter *nickserv-password-path* (merge-pathnames "/home/dodek/programowanie/projekty/klacz/nickserv.secret"))
 
 (defparameter *nickserv-password*
   (with-open-file (in *nickserv-password-path* :direction :input)
@@ -39,8 +36,3 @@
 (defparameter *min-topic-user-delay* '(2 :day))
 
 (defparameter *topic-delimiter* "|")
-
-
-(defparameter *idlekick-time* '(24 :hour))
-(defparameter *idlekick-exempts* '("klacz" "havoq" "pagenoare"))
-(defparameter *idlekick-channels* '("#qwpx"))

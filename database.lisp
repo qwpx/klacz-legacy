@@ -1,81 +1,111 @@
 (in-package :klacz)
 
-(defclass database-connection
-    (hu.dwim.perec:postgresql/perec)
-  ())
+(defvar *database-lock* (bordeaux-threads:make-lock "database lock")
+  "Lock for database writes.")
 
-(defparameter hu.dwim.perec:*database*
-  (make-instance 'database-connection
-    :connection-specification
-    `(:host ,*database-host*
-      :database ,*database-name*
-      :user-name ,*database-user*
-      :password  ,*database-password*)))
+(def class locking-prevalence-system (guarded-prevalence-system)
+  ((guard :initform (lambda (thunk)
+		      (bordeaux-threads:with-lock-held (*database-lock*) 
+			(funcall thunk))))))
 
-(defparameter hu.dwim.perec::*compiled-query-cache* 
-  (hu.dwim.perec::make-compiled-query-cache))
+(defvar *database* (make-prevalence-system *database-directory* 
+					   :prevalence-system-class 'locking-prevalence-system)
+  "Prevalence system.")
 
-(defun ensure-db-in-sync ()
-  (do-all-symbols (foo)
-    (when (persistent-class-type-p foo)
-      (hu.dwim.perec::export-to-rdbms (find-class foo)))))
+(def class* persistent-object-class (standard-class)
+  ()
+  (:documentation "Metaclass for persistent objects."))
+
+(defmethod make-persistent-instance ((class persistent-object-class) &rest slotargs)
+  (tx-create-object *database* class 
+		    (loop for args on slotargs by #'cddr
+		       collect (subseq args 0 2))))
+
+(defmethod make-persistent-instance ((class symbol) &rest slotargs)
+  (apply #'make-persistent-instance (find-class class) slotargs))
+
+(defmethod validate-superclass ((class persistent-object-class) (superclass standard-class))
+  "Yeah, they're compatible."
+  t)
 
 
-(defpclass* term ()
-  ((name :type (text 128) :unique t)
-   (visible t :type boolean)))
+(def function all-objects (class)
+  (find-all-objects *database* class))
 
-(defpclass* entry () 
-  ((text :type (text 256))
-   (visible t :type boolean)
-   (added-at (transaction-timestamp) :type timestamp)
-   (added-by :type (text 64))))
+(defgeneric select-instances (class function &key limit offset order-by order test-key order-key))
 
-(def persistent-association*
-    ((:class term :slot entries :type (set entry))
-     (:class entry :slot term :type term)))
-   
+(defmethod select-instances ((instances list) function 
+			     &key limit (offset 0) order-by order 
+			     (test-key #'identity) (order-key #'identity))
+  (loop 
+     for object in instances
+     
+     when (funcall function (funcall test-key object))
+     collect object into results
 
-(defpclass* log-entry ()
-  ((channel :type (text 64))
-   (kind :type (member action privmsg join part quit))
-   (nick :type (text 64))
-   (date (transaction-timestamp) :type timestamp :index t)
-   (message :type (text 256))))
+     finally (subseq  (if order-by
+			  (sort results
+				(ecase order
+				  (:asc order-by)
+				  (:desc (complement order-by)))
+				:key order-key)
+			  results)
+		      offset (+ offset limit))))
 
-(defpclass* memo ()
-  ((channel :type (text 64))
-   (from :type (text 64))
-   (to :type (text 64) :index t)
-   (date (transaction-timestamp) :type timestamp)
-   (active t :type boolean)
-   (message :type (text 256))))
+(defmethod select-instances ((class persistent-object-class) function 
+			     &rest args)
+  (apply #'select-instances (all-objects class) function args))
 
-(defpclass* topic-change ()
-  ((channel :type (text 64))
-   (user :type (text 64))
-   (text :type (text 256))
-   (date (transaction-timestamp) :type timestamp)))
+(defmethod select-instances ((class symbol) function &rest args)
+  (apply #'select-instances (find-class class) function args))
 
-(defpclass* poll ()
-  ((name :type (text 256))
-   (question :type (text 256))
-   (user :type (text 64))
-   (date (transaction-timestamp) :type timestamp)
-   (active t :type boolean)
-   (vote-limit :type integer)))
+(defmethod select-instance-with-slot (class slot value &key test) 
+  (find-object-with-slot *database* class slot value test))
 
-(defpclass* vote ()
-  ((user :type (text 64))
-   (date (transaction-timestamp) :type timestamp)))
 
-(def persistent-association*
-    ((:class poll :slot votes :type (set vote))
-     (:class vote :slot poll :type poll)))
-   
-(defpclass* link ()
-  ((user :type (text 64))
-   (channel :type (text 64))
-   (date (transaction-timestamp) :type timestamp)
-   (link :type (text 256) :unique t)
-   (post-count 1 :type integer)))
+(def class* term (object-with-id)
+  ((name)
+   (visible t))
+  (:metaclass persistent-object-class)) 
+
+(index-on *database* 'term '(name))
+
+(def class* entry (object-with-id) 
+  ((term-id :accessor get-term-id)
+   (text)
+   (visible t)
+   (added-at (now))
+   (added-by))
+  (:metaclass persistent-object-class))
+
+
+(defmethod term-of ((entry entry))
+  (find-object-with-id *database* 'term (get-term-id entry)))
+
+(defmethod entries-of ((term term))
+  (remove (get-id term) (find-all-objects *database* 'entry) 
+	  :key #'get-term-id :test-not #'eql))  
+
+(def class* memo (object-with-id)
+  ((channel)
+   (from)
+   (to)
+   (date (now))
+   (message))
+  (:metaclass persistent-object-class))
+
+(def class* topic-change (object-with-id)
+  ((channel)
+   (user)
+   (text)
+   (date (now)))
+  (:metaclass persistent-object-class))
+  
+(def class* link (object-with-id)
+  ((user)
+   (channel)
+   (date (now))
+   (link)
+   (post-count 1))
+  (:metaclass persistent-object-class))
+
