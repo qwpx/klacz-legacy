@@ -1,39 +1,32 @@
 (in-package #:cl-user)
 
-(defpackage #:klacz-system
+(defpackage #:net.qwpx.klacz-system
     (:use #:cl #:asdf))
 
-(in-package #:klacz-system)
+(in-package #:net.qwpx.klacz-system)
 
-(defsystem klacz
-    :name "klacz"
+(defsystem net.qwpx.klacz
+    :name "net.qwpx.klacz"
     :author "Adam 'Dodek' Michalik"
     :version "0.0"
     :licence "GNU GPL v3"
     :description "Klacz IRC bot."
     :properties ((#:author-email . "dodek@dodecki.net"))
-    :depends-on (:cl-irc 
-                 :cl-ppcre
-                 :metabang-bind 
-                 :anaphora 
-                 :bordeaux-threads
-                 :alexandria
-                 :hu.dwim.perec
-                 :hu.dwim.perec.postgresql
-                 :chanl
-                 :ironclad
-                 :drakma
-                 :cl-json
-                 :local-time
-		 :trivial-timeout
-                 :hunchentoot
-                 :cl-who)
+    :depends-on (:cl-irc :bordeaux-threads :cl-ppcre 
+                 :metabang-bind :anaphora :alexandria 
+		 :hu.dwim.defclass-star+hu.dwim.def :closer-mop
+                 :chanl :trivial-timeout :local-time
+		 :drakma :cl-json)
     :serial t
     :components ((:file "package")
                  (:file "settings")
-                 (:file "database")
-                 (:file "functions")
-                 (:file "web-queries")
+		 (:file "utils")
+		 (:file "reactor")
+		 (:file "functions")
 		 (:file "irc")
-                 (:file "urlgrabber-web")))
+                 #+nil(:file "database")
+                 #+nil(:file "functions")
+                 #+nil(:file "web-queries")
+		 #+nil(:file "irc")
+                 #+nil(:file "urlgrabber-web")))
 
