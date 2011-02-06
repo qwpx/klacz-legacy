@@ -15,7 +15,8 @@
     :depends-on (:cl-irc :bordeaux-threads :cl-ppcre 
                  :metabang-bind :anaphora :alexandria 
 		 :hu.dwim.defclass-star+hu.dwim.def :closer-mop
-                 :chanl :trivial-timeout :local-time)
+                 :chanl :trivial-timeout :local-time
+		 :drakma :cl-json)
     :serial t
     :components ((:file "package")
                  (:file "settings")

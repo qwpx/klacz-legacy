@@ -20,9 +20,15 @@
 (defparameter *function-permissions* (make-hash-table))
 
 (def reactor-hook :call ((reactor worker-reactor) irc-reactor message function line)
-  (let ((function-symbol (find-symbol (string-upcase function) (find-package :keyword))))
+  (let ((function-symbol (concatenate-symbol (string-upcase function) (find-package :keyword))))
     (handler-case 
-	(call-bot-function function-symbol irc-reactor message line)
+	(trivial-timeout:with-timeout (10)
+	  (call-bot-function function-symbol irc-reactor message line))
+      (trivial-timeout:timeout-error ()
+	(call-reactor irc-reactor :reply-to message
+		      (format nil "At ~A, function ~S timed out."
+			      (format-timestring nil (now) :format *date-format*)
+			      function)))
       (error (e)
 	(call-reactor irc-reactor :reply-to message
 		      (format nil "At ~A, a ~S has been encountered: ~A" 
@@ -75,4 +81,5 @@
   (call-reactor irc-reactor :reply-to message
 		(format-timestring nil (now) :format *date-format*)))
 
-
+(def bot-function :more (irc-reactor message line)
+  (call-reactor irc-reactor :more message))

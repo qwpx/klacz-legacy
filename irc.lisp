@@ -71,21 +71,27 @@
       (source message)
       (first (arguments message))))
 
-(def reactor-hook :reply-to ((reactor irc-reactor) message arg)
-  (when (stringp arg)
-    (setf arg (split-sequence:split-sequence #\Newline arg)))
+(def reactor-hook :privmsg-lines ((reactor irc-reactor) target lines)
   (loop
-     with connection = (connection-of reactor)
-     with target = (reply-target connection message)
-     for cdrs on arg 
+     for cdrs on lines
      repeat *max-bot-lines*
      do (irc #'privmsg reactor target (car cdrs))
      finally (progn 
 	       (when cdrs
 		 (irc #'privmsg reactor target
 			       (format nil "But wait, there's more! (~D more, type ,more)"
-				       (length cdrs)))
-		 (setf (more-lines-of reactor) cdrs)))))
+				       (length cdrs))))
+	       (setf (more-lines-of reactor) cdrs))))
+
+(def reactor-hook :reply-to ((reactor irc-reactor) message arg)
+  (when (stringp arg)
+    (setf arg (split-sequence:split-sequence #\Newline arg)))
+  (call-reactor reactor :privmsg-lines
+		(reply-target (connection-of reactor) message)
+		arg))
+
+(def reactor-hook :more ((reactor irc-reactor) message)
+  (call-reactor reactor :reply-to message (more-lines-of reactor)))
 
 (def reactor-hook :privmsg ((reactor irc-reactor) target msg)
   (privmsg (connection-of reactor) target msg))
