@@ -1,4 +1,4 @@
-(in-package :klacz)
+(in-package :net.qwpx.klacz)
 
 (def class* reactor ()
   ((channel (make-instance 'chanl:unbounded-channel))))
@@ -18,7 +18,8 @@
 		do (with-simple-restart (continue-processing "Continue processing messages")
 		     (call-reactor-hook reactor hook args))))))
     (if background
-	(bordeaux-threads:make-thread #'reactor :initial-bindings initial-bindings)
+	(bordeaux-threads:make-thread #'reactor :name (string (class-name (class-of reactor)))
+				      :initial-bindings initial-bindings)
 	(bind (((symbols values) (unzip-alist initial-bindings)))
 	  (progv symbols values
 	    (reactor))))))
@@ -42,7 +43,7 @@
   (apply function args))
 
 (def reactor-hook :unhandled-hook ((reactor reactor) hook-name args)
-  (format *error-output* "UNHANDLED HOOK: ~S with args ~S on reactor ~S~%" hook-name args reactor))
+  (format *error-output* "(~S) UNHANDLED HOOK: ~S with args ~S~%" reactor hook-name args))
 
 (defmethod call-reactor-hook ((reactor reactor) hook args)
   (call-reactor reactor :unhandled-hook hook args))

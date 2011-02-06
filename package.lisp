@@ -1,8 +1,8 @@
-(defpackage :klacz
-  (:use :common-lisp :cl-irc :metabang.bind :anaphora :alexandria
+(defpackage :net.qwpx.klacz
+  (:nicknames :klacz)
+  (:use :common-lisp :cl-irc :metabang.bind :anaphora :alexandria :ppcre
 	:hu.dwim.def :hu.dwim.defclass-star 
-	:local-time :cl-who :cl-prevalence :closer-mop)
-  (:shadowing-import-from :cl-prevalence :name)
+	:local-time :closer-mop)
   (:shadowing-import-from :closer-mop
                           :defgeneric
                           :defmethod

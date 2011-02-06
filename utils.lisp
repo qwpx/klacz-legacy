@@ -20,7 +20,16 @@
         (intern symbol-name package)
         (intern symbol-name))))
 
-
 (def function unzip-alist (list)
   (list (mapcar #'car list)
 	(mapcar #'cdr list)))
+
+(def function map-plist (function plist)
+  (loop 
+     for (key value . rest) on plist by #'cddr
+     collect (funcall function key value)))
+
+(def function mapc-plist (function plist)
+  (loop 
+     for (key value . rest) on plist by #'cddr
+     do (funcall function key value)))

@@ -1,31 +1,29 @@
 (in-package #:cl-user)
 
-(defpackage #:klacz-system
+(defpackage #:net.qwpx.klacz-system
     (:use #:cl #:asdf))
 
-(in-package #:klacz-system)
+(in-package #:net.qwpx.klacz-system)
 
-(defsystem klacz
-    :name "klacz"
+(defsystem net.qwpx.klacz
+    :name "net.qwpx.klacz"
     :author "Adam 'Dodek' Michalik"
     :version "0.0"
     :licence "GNU GPL v3"
     :description "Klacz IRC bot."
     :properties ((#:author-email . "dodek@dodecki.net"))
-    :depends-on (:cl-irc :bordeaux-threads :drakma :hunchentoot
-                 :cl-ppcre :cl-json
+    :depends-on (:cl-irc :bordeaux-threads :cl-ppcre 
                  :metabang-bind :anaphora :alexandria 
 		 :hu.dwim.defclass-star+hu.dwim.def :closer-mop
-                 :chanl :trivial-timeout
-                 :ironclad :cl-who :local-time 
-                 :cl-prevalence)
+                 :chanl :trivial-timeout :local-time)
     :serial t
     :components ((:file "package")
                  (:file "settings")
 		 (:file "utils")
 		 (:file "reactor")
+		 (:file "functions")
 		 (:file "irc")
-                 (:file "database")
+                 #+nil(:file "database")
                  #+nil(:file "functions")
                  #+nil(:file "web-queries")
 		 #+nil(:file "irc")
