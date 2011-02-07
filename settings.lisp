@@ -1,17 +1,29 @@
 (in-package :klacz)
 
+(defparameter *database-host* "localhost")
+(defparameter *database-name* "klacz")
+(defparameter *database-user* "klacz")
+(defparameter *database-password* "klacz")
 
 (defparameter *date-format*
   `((:day 2) #\. (:month 2) #\. (:year 4) #\space (:hour 2) #\: (:min 2) #\: (:sec 2) #\space :timezone))
 
-(defparameter *bing-appid* "565F82ECDBD0DE7B08A4C39664E9265156F7701D")
 
-(defparameter *nickserv-password-path* (merge-pathnames "/home/dodek/programowanie/projekty/klacz/nickserv.secret"))
+(defparameter *klacz-path* (merge-pathnames "/home/dodek/klacz2/klacz/"))
+(defparameter *nickserv-password-path* (merge-pathnames "nickserv.secret"
+							*klacz-path*))
+(defparameter *google-api-key-path* (merge-pathnames "google.secret"
+						     *klacz-path*))
+(defparameter *bing-appid-path* (merge-pathnames "bing.secret"
+						 *klacz-path*))
 
-(defparameter *nickserv-password*
-  (with-open-file (in *nickserv-password-path* :direction :input)
+(def function read-secret (path)
+  (with-open-file (in path :direction :input)
     (read-line in nil nil)))
 
+(defparameter *nickserv-password* (read-secret *nickserv-password-path*))
+(defparameter *google-api-key* (read-secret *google-api-key-path*))
+(defparameter *bing-appid* (read-secret *bing-appid-path*))
 
 (defparameter *max-bot-lines* 4)
                                  

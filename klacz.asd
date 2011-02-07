@@ -16,13 +16,17 @@
                  :metabang-bind :anaphora :alexandria 
 		 :hu.dwim.defclass-star+hu.dwim.def :closer-mop
                  :chanl :trivial-timeout :local-time
-		 :drakma :cl-json)
+		 :drakma :cl-json
+		 :hu.dwim.perec :hu.dwim.perec.postgresql
+		 :hu.dwim.syntax-sugar+hu.dwim.walker)
     :serial t
     :components ((:file "package")
                  (:file "settings")
+		 (:file "database")
 		 (:file "utils")
 		 (:file "reactor")
 		 (:file "functions")
+		 (:file "queries")
 		 (:file "irc")
                  #+nil(:file "database")
                  #+nil(:file "functions")

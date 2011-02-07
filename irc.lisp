@@ -9,6 +9,7 @@
    (default-channels)
    (nickserv-password)
    (more-lines nil)
+   (identified-db (make-hash-table :test 'equal))
    (worker-reactor (make-instance 'worker-reactor))))
 
 (defparameter *irc-hook-mappings* (make-hash-table :test 'eq))
@@ -21,15 +22,14 @@
 				   (find-package :irc)))))
   (mapc #'create-hook-mapping 
 	'(:privmsg :notice :kick :topic :error :mode :ping
-		  :nick :join :part :quit :kill :pong :invite))
+	  :nick :join :part :quit :kill :pong :invite))
   (mapc #'create-hook-mapping (mapcar #'second irc::*reply-names*)))
 
 
 (defmethod setup-hook-mappings ((reactor irc-reactor) (connection connection))
   (flet ((map-hook (reactor-hook irc-hook)
 	   (add-hook connection irc-hook 
-		     (lambda (message)
-		       (call-reactor reactor reactor-hook message))))) 
+		     #L(call-reactor reactor reactor-hook !1)))) 
     (maphash #'map-hook *irc-hook-mappings*)))
 
 (defmethod run-reactor :before ((reactor irc-reactor) &rest args)
@@ -49,9 +49,9 @@
 	       (sb-int:closed-stream-error () 
 		 ;; ignore
 		 nil))))
-	(bordeaux-threads:make-thread #'irc-listener
-				      :name (format nil "IRC-LISTENER-FOR-~A"
-						    (class-name (class-of reactor)))))))
+      (bordeaux-threads:make-thread #'irc-listener
+				    :name (format nil "IRC-LISTENER-FOR-~A"
+						  (class-name (class-of reactor)))))))
 
 (def reactor-hook :irc ((reactor irc-reactor) function &rest args)
   (apply function (connection-of reactor) args))
@@ -65,11 +65,12 @@
   (call-next-method))
 
 
-(def function reply-target (connection message)
-  (if (string= (first (arguments message)) ;;check whether received on a channel or privmsg
-	       (nickname (user connection))) 
-      (source message)
-      (first (arguments message))))
+(def function reply-target (message)
+  (let ((connection (connection message)))
+    (if (string= (first (arguments message)) ;;check whether received on a channel or privmsg
+		 (nickname (user connection))) 
+	(source message)
+	(first (arguments message)))))
 
 (def reactor-hook :privmsg-lines ((reactor irc-reactor) target lines)
   (loop
@@ -79,15 +80,15 @@
      finally (progn 
 	       (when cdrs
 		 (irc #'privmsg reactor target
-			       (format nil "But wait, there's more! (~D more, type ,more)"
-				       (length cdrs))))
+		      (format nil "But wait, there's more! (~D more, type ,more)"
+			      (length cdrs))))
 	       (setf (more-lines-of reactor) cdrs))))
 
 (def reactor-hook :reply-to ((reactor irc-reactor) message arg)
   (when (stringp arg)
     (setf arg (split-sequence:split-sequence #\Newline arg)))
   (call-reactor reactor :privmsg-lines
-		(reply-target (connection-of reactor) message)
+		(reply-target message)
 		arg))
 
 (def reactor-hook :more ((reactor irc-reactor) message)
@@ -114,8 +115,9 @@
 
 (def irc-connection qwpx-irc-connection
     :server "irc.freenode.net"
-    :nickname "klacz-test"
-    :channels '("#xyzzytest"))
+    :nickname "klacz"
+    :channels '("#xyzzytest" "#qwpx")
+    :nickserv-password *nickserv-password*)
 
 (defvar *qwpx-irc-reactor*)
 
@@ -130,9 +132,98 @@
   (call-reactor *qwpx-irc-reactor* :quit)
   (setf *qwpx-irc-reactor* nil))
 
+
+(def function create-seen-entry (nick where kind message)
+  (purge (s) (from (s seen))
+	 (where (eq (nickname-of s) nick)))
+  (make-instance 'seen :nickname nick :where where :kind kind :message message))
+
 (defparameter *message-regexp* (ppcre:create-scanner "^,\\s*(\\S+).*$"))
 
-(def reactor-hook :irc-privmsg-message ((reactor qwpx-irc-connection) message)
-  (ppcre:register-groups-bind (function-name) (*message-regexp* (trailing-argument message))
+(def function parse-message-line (reactor message)
+  (ppcre:register-groups-bind (function-name) (*message-regexp* (second (arguments message)))
     (call-reactor (worker-reactor-of reactor) :call
-		  reactor message function-name (trailing-argument message))))
+		  reactor message function-name (second (arguments message)))))
+
+(def function maybe-memo (reactor message)
+  (let* ((nick (source message))
+	 (memos (select-instances (m memo)
+		  (where (eq (to-of m) nick))))
+	 (lines (list* (format nil "~A: You've got ~D new message~:P:"
+			       (source message) (length memos))
+		       (mapcar #L(format nil "From ~A at ~A: ~A"
+					 (from-of !1)
+					 (format-timestring nil (date-of !1)
+							    :format *date-format*)
+					 (message-of !1))
+			       memos))))
+    (when memos 
+      (purge (m) (from (m memo))
+	     (where (eq (to-of m) nick)))
+      (call-reactor reactor :reply-to message
+		    lines))))
+
+(defparameter *link-regexp* (ppcre:create-scanner "(\\w+://.*?)( |$)"))
+
+(def function search-for-url-in-message (reactor message)
+  (ppcre:register-groups-bind (link-text) (*link-regexp* (second (arguments message)))
+    (aif (select-instance (l link)
+	   (where (eq (link-of l) link-text)))
+	 (let ((author (user-of it))
+	       (date (format-timestring nil (date-of it) :format *date-format*))
+	       (post-count (post-count-of it)))
+	   (incf (post-count-of it))
+	   (irc #'notice reactor (first (arguments message))
+		   (format nil "That link has already been posted ~D time~:P (originally by ~A at ~A)"
+			   post-count author date)))                             
+	 (make-instance 'link
+			:channel (first (arguments message))
+			:user (source message)
+			:link link-text))))
+
+
+
+(def reactor-hook :irc-privmsg-message ((reactor qwpx-irc-connection) message)
+  (with-transaction 
+    (create-seen-entry (source message) (reply-target message) 
+		       :privmsg (second (arguments message)))
+    (search-for-url-in-message reactor message)
+    (maybe-memo reactor message)
+    (parse-message-line reactor message)))
+
+(def reactor-hook :irc-join-message ((reactor qwpx-irc-connection) message)
+  (with-transaction
+    (start-identification reactor (source message))
+    (create-seen-entry (source message) (reply-target message) 
+		       :join "")))
+
+(def reactor-hook :irc-part-message ((reactor qwpx-irc-connection) message)
+  (with-transaction
+    (unidentify reactor (source message))
+    (create-seen-entry (source message) (reply-target message) 
+		       :part (or (second (arguments message)) ""))))
+
+(def reactor-hook :irc-quit-message ((reactor qwpx-irc-connection) message)
+  (with-transaction
+    (unidentify reactor (source message))
+    (create-seen-entry (source message) "QUIT"
+		       :quit (or (second (arguments message)) ""))))
+
+(def reactor-hook :irc-rpl_whoisidentified-message ((reactor qwpx-irc-connection) message)
+  (let ((nick (second (arguments message)))
+	(account (third (arguments message))))
+    (identify reactor nick account)))
+
+
+(def function start-identification (reactor nickname)
+  (irc #'whois reactor nickname))
+
+(def function identify (reactor nick account)
+  (setf (gethash nick (identified-db-of reactor))
+	  account))
+
+(def function unidentify (reactor nick)
+  (remhash nick (identified-db-of reactor)))
+
+(def function nick->account (reactor nick)
+  (gethash nick (identified-db-of reactor)))

@@ -27,8 +27,9 @@
 (def definer reactor-hook (hook-class lambda-list &body body)
   (with-gensyms (hook args)
     `(defmethod call-reactor-hook (,(car lambda-list) (,hook (eql,hook-class)) ,args)
-       (destructuring-bind ,(cdr lambda-list) ,args
-	 ,@body))))
+       (block reactor-hook
+	 (destructuring-bind ,(cdr lambda-list) ,args
+	   ,@body)))))
 
 (defgeneric call-reactor (reactor hook &rest args))
 

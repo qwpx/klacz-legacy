@@ -20,22 +20,34 @@
 (defparameter *function-permissions* (make-hash-table))
 
 (def reactor-hook :call ((reactor worker-reactor) irc-reactor message function line)
-  (let ((function-symbol (concatenate-symbol (string-upcase function) (find-package :keyword))))
-    (handler-case 
-	(trivial-timeout:with-timeout (10)
-	  (call-bot-function function-symbol irc-reactor message line))
-      (trivial-timeout:timeout-error ()
-	(call-reactor irc-reactor :reply-to message
-		      (format nil "At ~A, function ~S timed out."
-			      (format-timestring nil (now) :format *date-format*)
-			      function)))
-      (error (e)
-	(call-reactor irc-reactor :reply-to message
-		      (format nil "At ~A, a ~S has been encountered: ~A" 
-			      (format-timestring nil (now) :format *date-format*)
-			      (class-name (class-of e))
-			      e))
-	(call-reactor irc-reactor :new-error e)))))
+  (let* ((function-symbol (concatenate-symbol (string-upcase function) (find-package :keyword)))
+	 (account (nick->account irc-reactor (source message)))
+	 (place (reply-target message))
+	 (level-needed (gethash function-symbol *function-permissions*)))
+    (with-transaction
+     (when (> level-needed 0)
+       (let ((level (select-instance (l level) 
+		      (where (and (eq (account-of l) account)
+				  (eq (channel-of l) place))))))
+	 (unless (and level (>= (level-of level) level-needed))
+	   (call-reactor irc-reactor :reply-to message
+			 (format nil "You do not have the right to call this function: ~A" function-symbol))
+	   (return-from reactor-hook nil))))  
+     (handler-case 
+	 (trivial-timeout:with-timeout (10)
+	   (call-bot-function function-symbol irc-reactor message line))
+       (trivial-timeout:timeout-error ()
+	 (call-reactor irc-reactor :reply-to message
+		       (format nil "At ~A, function ~S timed out."
+			       (format-timestring nil (now) :format *date-format*)
+			       function)))
+       (error (e)
+	 (call-reactor irc-reactor :reply-to message
+		       (format nil "At ~A, a ~S has been encountered: ~A" 
+			       (format-timestring nil (now) :format *date-format*)
+			       (class-name (class-of e))
+			       e))
+	 (call-reactor irc-reactor :new-error e))))))
 
 (def definer bot-function (name-and/or-qualifiers lambda-list &body body)
   (bind (((:values name qualifiers) 
@@ -118,3 +130,60 @@
   (call-reactor irc-reactor :reply-to message 
 		(format nil "~A: pong" (source message))))
 
+
+(def bot-function :memo (irc-reactor message line)
+  "Leaves user a memo."
+  (with-arglist (to &rest memo) (line irc-reactor message)
+    (make-instance 'memo 
+		   :from (source message) 
+		   :to to
+		   :message memo)
+    (call-reactor irc-reactor :reply-to message
+		  (format nil "Added memo for ~S." to))))
+
+(def bot-function :seen (irc-reactor message line)
+  (with-arglist (who) (line irc-reactor message)
+    (let ((last-seen (select-instance (s seen)
+		       (where (eq (nickname-of s) who)))))
+      (call-reactor irc-reactor :reply-to message
+		    (if last-seen
+			(with-slots (nickname date where kind message) last-seen
+			  (format nil "Last seen ~A: ~A on ~A ~A ~A" 
+				  nickname 
+				  where
+				  (format-timestring nil date :format *date-format*)
+				  kind message))
+			(format nil "Never seen ~A." who))))))
+
+
+(def bot-function :identified? (irc-reactor message line)
+  "Checks whether given nickname is identified."
+  (let ((account (nick->account irc-reactor (source message))))
+    (call-reactor irc-reactor :reply-to message
+		  (if account
+		      (format nil "~A is identified as ~A." (source message) account)
+		      (format nil "~A is not identified." (source message))))))
+
+(def bot-function :identify (irc-reactor message line)
+  "Identifies user."
+  (let ((nick (source message)))
+    (start-identification irc-reactor nick)
+    (call-reactor irc-reactor :reply-to message
+		  (format nil "Attempting to identify ~A." nick))))
+
+(def bot-function (:add-level :level 100) (irc-reactor message line)
+  "Increases user privileges."
+  (with-arglist (account channel new-level) (line irc-reactor message)
+    (setf new-level (parse-integer new-level))
+    (purge (l) (from (l level)) 
+	   (where (and (eq (account-of l) account)
+		       (eq (channel-of l) channel))))
+    (make-instance 'level :account account :channel channel :level new-level)
+    (call-reactor irc-reactor :reply-to message
+		  (format nil "User ~A has now level ~D on channel ~A."
+			  account new-level channel))))
+
+(def bot-function (:kick :level 10) (irc-reactor message line)
+  "Kicks given user."
+  (with-arglist (nick &rest reason) (line irc-reactor message)
+    (irc #'kick irc-reactor (reply-target message) nick reason)))

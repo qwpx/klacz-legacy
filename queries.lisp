@@ -38,9 +38,6 @@
 (defparameter *google-translate-url*
   "https://www.googleapis.com/language/translate/v2")
 
-(defparameter *google-api-key*
-  "AIzaSyA_gxermeyh00gzpCLSGPnbAsZR1r6s0oc")
-
 (defun do-google-translate (term source target)
   (or
    (find-subtree 
@@ -71,8 +68,7 @@
     (ppcre:do-register-groups (wolfram-result) 
         ("\\{\"stringified\": \"\\s*?(.*?)\\s*?\"" result)
       (push wolfram-result all-results))
-    (mapcar (lambda (line)
-	      (ppcre:regex-replace-all "\\\\n" line (string #\newline)))
+    (mapcar #L(ppcre:regex-replace-all "\\\\n" !1 (string #\newline))
 	    (nreverse all-results)))) ; dirty stuff, but who gives a shit
 
 (def bot-function :c (irc-reactor message line)

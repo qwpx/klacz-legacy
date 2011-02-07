@@ -1,7 +1,7 @@
-(defpackage :net.qwpx.klacz
-  (:nicknames :klacz)
+(hu.dwim.def:def hu.dwim.def:package :net.qwpx.klacz
+    (:nicknames :klacz)
   (:use :common-lisp :cl-irc :metabang.bind :anaphora :alexandria :ppcre
-	:hu.dwim.def :hu.dwim.defclass-star 
+	:hu.dwim.def :hu.dwim.defclass-star :hu.dwim.perec :hu.dwim.syntax-sugar
 	:local-time :closer-mop)
   (:shadowing-import-from :closer-mop
                           :defgeneric
@@ -11,9 +11,16 @@
                           :remove-method
                           :standard-class
                           :standard-method
-                          :standard-generic-function))
+                          :standard-generic-function)
+  (:shadowing-import-from :hu.dwim.perec :set :time)
+  (:readtable-setup
+   (hu.dwim.syntax-sugar:enable-sharp-l-syntax)))
 
-(defpackage :klacz-eval 
+(in-package :net.qwpx.klacz)
+
+(hu.dwim.syntax-sugar:enable-sharp-l-syntax)
+
+(hu.dwim.def:def hu.dwim.def:package :klacz-eval 
   (:use :common-lisp))
 
 
