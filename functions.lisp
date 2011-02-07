@@ -1,5 +1,7 @@
 (in-package :klacz)
 
+(hu.dwim.syntax-sugar:enable-sharp-l-syntax)
+
 (def class* worker-reactor (reactor)
   ())
 
@@ -199,3 +201,27 @@
       (call-reactor irc-reactor :reply-to message
 		    (format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
      
+(def bot-function :pick (irc-reactor message line)
+  "Sorts items in arbitrary order."
+  (flet ((sum-vector (vector)
+           (loop for n across vector sum n)))
+    (with-arglist (&rest to-pick) (line irc-reactor message)
+      (let* ((words (ppcre:split "\\s+" to-pick))
+	     (hashes (mapcar (lambda (w)
+			       (list w (sum-vector 
+					(ironclad:digest-sequence 
+					 :md5 (babel:string-to-octets w)))))
+			     words)))
+	(call-reactor irc-reactor :reply-to message 
+		      (format nil "~{~A~^ > ~}"
+			      (mapcar #'first (sort hashes #'> :key #'second))))))))
+
+
+(def bot-function :my-levels (irc-reactor message line)
+  (let* ((account (nick->account irc-reactor (source message)))
+	 (levels (select-instances (l level) 
+		  (where (eq (account-of l) account)))))
+    (call-reactor irc-reactor :reply-to message
+		  (format nil "Your levels: ~{~{~A: ~A~}~^, ~}"
+			  (mapcar #L(list (channel-of !1) (level-of !1))
+				  levels)))))
