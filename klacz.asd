@@ -18,7 +18,8 @@
                  :chanl :trivial-timeout :local-time
 		 :drakma :cl-json
 		 :hu.dwim.perec :hu.dwim.perec.postgresql
-		 :hu.dwim.syntax-sugar+hu.dwim.walker)
+		 :hu.dwim.syntax-sugar+hu.dwim.walker
+		 :com.informatimago.common-lisp.lisp-reader)
     :serial t
     :components ((:file "package")
                  (:file "settings")

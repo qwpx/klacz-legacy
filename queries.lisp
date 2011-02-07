@@ -1,5 +1,7 @@
 (in-package :net.qwpx.klacz)
 
+(hu.dwim.syntax-sugar:enable-sharp-l-syntax)
+
 (setf drakma:*drakma-default-external-format* :utf-8)
 
 (defun strip-tags (string)

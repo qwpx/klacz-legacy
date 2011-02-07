@@ -1,5 +1,7 @@
 (in-package :klacz)
 
+(hu.dwim.syntax-sugar:enable-sharp-l-syntax)
+
 (def class* irc-reactor (reactor) 
   ((connection)
    (socket)
@@ -116,7 +118,7 @@
 (def irc-connection qwpx-irc-connection
     :server "irc.freenode.net"
     :nickname "klacz"
-    :channels '("#xyzzytest" "#qwpx")
+    :channels '("#xyzzytest" "#qwpx" "#lisp-pl")
     :nickserv-password *nickserv-password*)
 
 (defvar *qwpx-irc-reactor*)
@@ -214,6 +216,12 @@
 	(account (third (arguments message))))
     (identify reactor nick account)))
 
+
+(def reactor-hook :irc-rpl_endofnames-message ((reactor qwpx-irc-connection) message)
+  (let* ((channel-name (second (arguments message)))
+	 (channel (find-channel (connection-of reactor) channel-name)))
+    (maphash-keys #L(start-identification reactor !1)
+		  (users channel))))
 
 (def function start-identification (reactor nickname)
   (irc #'whois reactor nickname))

@@ -187,3 +187,15 @@
   "Kicks given user."
   (with-arglist (nick &rest reason) (line irc-reactor message)
     (irc #'kick irc-reactor (reply-target message) nick reason)))
+
+(def bot-function (:eval :level 5) (irc-reactor message line)
+  (with-arglist (&rest code) (line irc-reactor message)
+    (let* ((out (make-string-output-stream))
+	   (result (let* ((*standard-output* out)
+			  (*error-output* out)
+			  (*package* (find-package :klacz-eval))
+			  (form (com.informatimago.common-lisp.lisp-reader.reader:read-from-string code)))
+		     (eval form))))
+      (call-reactor irc-reactor :reply-to message
+		    (format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
+     
