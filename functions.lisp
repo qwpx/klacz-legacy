@@ -25,7 +25,7 @@
 	 (place (reply-target message))
 	 (level-needed (gethash function-symbol *function-permissions*)))
     (with-transaction
-     (when (> level-needed 0)
+      (when (> (or level-needed 0) 0)
        (let ((level (select-instance (l level) 
 		      (where (and (eq (account-of l) account)
 				  (eq (channel-of l) place))))))
