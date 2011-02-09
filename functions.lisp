@@ -225,3 +225,58 @@
 		  (format nil "Your levels: ~{~{~A: ~A~}~^, ~}"
 			  (mapcar #L(list (channel-of !1) (level-of !1))
 				  levels)))))
+
+(def bot-function (:topic :level 1) (irc-reactor message line)
+  (with-arglist (&rest text) (line irc-reactor message)
+    (let* ((account (nick->account irc-reactor (source message)))
+	   (channel-name (first (arguments message)))
+	   (topic-change (select-instance (c topic-change)
+			   (where (and (eq (user-of c) account)
+				       (eq (channel-of c) channel-name)
+				       (eq (date-of c) 
+					   (select ((max (date-of tc)))
+					     (from (tc topic-change))
+					     (where (and (eq (user-of tc) account)
+							 (eq (channel-of tc) channel-name)))))))))
+	   (last-change (select-instance (c topic-change)
+			  (where (and (eq (channel-of c) channel-name)
+				      (eq (date-of c)
+					  (select ((max (date-of tc)))
+					    (from (tc topic-change))
+					    (where (eq (channel-of tc) channel-name))))))))
+	   (time-now (now)))
+      (cond 
+	;; topic was recently changed
+	((and last-change 
+	      (timestamp>= (apply #'timestamp+ (date-of last-change) 
+				  *min-topic-delay*)
+			   time-now))
+              (let ((last-date (date-of last-change)))
+                (call-reactor irc-reactor :reply-to message 
+			      (format nil "Not enough time has passed since last topic change (was ~A)"
+				      (format-timestring nil last-date :format *date-format*)))))
+	;; user recently changed topic
+	((and topic-change
+	      (timestamp>= (apply #'timestamp+ (date-of topic-change)
+				  *min-topic-user-delay*)
+			   time-now))
+	 (let ((last-date (date-of topic-change)))
+	   (call-reactor irc-reactor :reply-to message 
+			 (format nil "Not enough time has passed since ~A's last topic change (was ~A)"
+				 account
+				 (format-timestring nil last-date :format *date-format*)))))
+	;; topic contains delimiter
+	((ppcre:scan `(:group ,*topic-delimiter*) text)
+	 (call-reactor irc-reactor :reply-to message 
+		       (format nil "New topic contains topic delimiter (~S)" *topic-delimiter*)))
+	;; ok, we're changing topic
+	(t
+	 (let* ((old-topic (topic (find-channel (connection message) channel-name)))
+		(topic-groups (ppcre:split `(:group ,*topic-delimiter*) old-topic))
+		new-topic)
+	   (setf (nth (1- (length topic-groups)) topic-groups) (concatenate 'string " " text)
+		 new-topic  (join-strings topic-groups *topic-delimiter*))
+	   (irc #'topic- irc-reactor channel-name new-topic)
+	   (make-instance 'topic-change :channel channel-name :text text :user account)))))))
+
+

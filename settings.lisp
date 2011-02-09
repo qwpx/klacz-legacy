@@ -27,3 +27,7 @@
 
 (defparameter *max-bot-lines* 4)
                                  
+(defparameter *min-topic-delay* '(1 :hour))
+(defparameter *min-topic-user-delay* '(2 :day))
+
+(defparameter *topic-delimiter* "|")
