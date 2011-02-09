@@ -16,8 +16,12 @@
 (defgeneric call-bot-function (name reactor message line))
 
 (defmethod call-bot-function (unknown irc-reactor message line)
-  (call-reactor irc-reactor :reply-to message
-		(format nil "Unknown function ~S called with arg ~S." unknown line)))
+  (let ((space-pos (position #\Space line)))
+    (if (and space-pos
+	     (position #\Space line :test (compose #'not #'eql) :start space-pos))
+	(call-reactor irc-reactor :reply-to message
+		      (format nil "Unknown function ~S called with arg ~S." unknown line))
+	(random-entry irc-reactor message (string unknown) ))))
 
 (defparameter *function-permissions* (make-hash-table))
 
@@ -279,4 +283,71 @@
 	   (irc #'topic- irc-reactor channel-name new-topic)
 	   (make-instance 'topic-change :channel channel-name :text text :user account)))))))
 
+(def macro with-term ((var-name) (term-name irc-reactor message) &body body)
+  `(let ((,var-name (select-instance (term term)
+		      (where (and (visible-p term) 
+				  (eq (sql-text "lower(_name)")
+				      (string-downcase ,term-name)))))))
+     (if (null ,var-name)
+         (call-reactor ,irc-reactor :reply-to ,message
+		       (format nil "Term ~S not found." ,term-name))
+         (progn 
+           ,@body))))
 
+
+(def bot-function :describe (irc-reactor message line)
+  "Describes term."
+  (with-arglist (term-name) (line irc-reactor message)
+    (with-term (term) (term-name irc-reactor message)
+      (let* ((n 0)
+	     (lines (list* (format nil "I heard ~S is:" (name-of term))
+			   (mapcar #L(prog1
+					 (format nil "[~D] ~A" n (text-of !1))
+				       (incf n))
+				   (select-instances (e entry)
+				     (where (and (eq (term-of e) term)
+						 (eq (visible-p e) t)))
+				     (order-by :ascending (added-at-of e)))))))
+	(call-reactor irc-reactor :reply-to message 
+		      lines)))))
+
+(def function random-entry (irc-reactor message term-name)
+  (with-term (term) (term-name irc-reactor message)
+      (let ((entry-count (first (select ((count e)) (from (e entry)) 
+					(where (and (eq (term-of e) term)
+						    (eq (visible-p e) t)))))))
+	(when entry-count
+	  (let* ((entry (first (select-instances (e entry) 
+				(where (and (eq (term-of e) term)
+					    (eq (visible-p e) t)))
+				(offset (random entry-count))
+				(limit 1))))
+		 (text (text-of entry)))
+	    (call-reactor irc-reactor :reply-to message
+			  text))))))
+
+
+(def bot-function :random-entry (irc-reactor message line)
+  "Prints randomly chosen entry."
+  (with-arglist (term-name) (line irc-reactor message)
+    (random-entry irc-reactor message term-name)))
+
+(def bot-function :add (irc-reactor message line)
+  "Adds new entry to term, possibly creating the term."
+  (with-arglist (term-name &rest entry-text) (line irc-reactor message)
+    (let ((term (select-instance (term term)
+		  (where (eq (sql-text "lower(_name)")
+			     (string-downcase term-name))))))
+      (unless term
+	(setf term (make-instance 'term :name term-name))
+	(call-reactor irc-reactor :reply-to message
+		      (format nil "Created term ~S" term-name)))
+      (unless (visible-p term)
+	(setf (visible-p term) t))
+      (make-instance 'entry 
+		     :term term
+		     :text entry-text
+		     :added-by (source message))
+      (call-reactor irc-reactor :reply-to message
+		    (format nil "Added one entry to term ~S"
+			    term-name)))))
