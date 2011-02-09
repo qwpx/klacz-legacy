@@ -54,3 +54,7 @@
   (loop 
      for (key value . rest) on plist by #'cddr
      do (funcall function key value)))
+
+(def function join-strings (strings &optional (delimiter ""))
+  (reduce (lambda (x y) (concatenate 'string x delimiter y))
+          strings))

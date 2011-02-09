@@ -150,7 +150,7 @@
 (def function maybe-memo (reactor message)
   (let* ((nick (source message))
 	 (memos (select-instances (m memo)
-		  (where (eq (to-of m) nick))))
+		  (where (eq (to-of m) (string-downcase nick)))))
 	 (lines (list* (format nil "~A: You've got ~D new message~:P:"
 			       (source message) (length memos))
 		       (mapcar #L(format nil "From ~A at ~A: ~A"
@@ -161,7 +161,7 @@
 			       memos))))
     (when memos 
       (purge (m) (from (m memo))
-	     (where (eq (to-of m) nick)))
+	     (where (eq (to-of m) (string-downcase nick))))
       (call-reactor reactor :reply-to message
 		    lines))))
 
