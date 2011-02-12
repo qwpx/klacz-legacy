@@ -351,3 +351,14 @@
       (call-reactor irc-reactor :reply-to message
 		    (format nil "Added one entry to term ~S"
 			    term-name)))))
+
+(let ((n 6))
+  (def bot-function :sru (irc-reactor message line)
+    (if (zerop (random n))
+	(progn
+	  (irc #'kick irc-reactor (first (arguments message)) (source message))
+	  (setf n 6))
+	(progn
+	  (call-reactor irc-reactor :reply-to message
+			(format nil "You were lucky this time. (chance 1/~D)" n))
+	  (decf n)))))
