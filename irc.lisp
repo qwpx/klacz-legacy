@@ -170,7 +170,8 @@
 (def function search-for-url-in-message (reactor message)
   (ppcre:register-groups-bind (link-text) (*link-regexp* (second (arguments message)))
     (aif (select-instance (l link)
-	   (where (eq (link-of l) link-text)))
+	   (where (and (eq (channel-of l) (first (arguments message)))
+		       (eq (link-of l) link-text))))
 	 (let ((author (user-of it))
 	       (date (format-timestring nil (date-of it) :format *date-format*))
 	       (post-count (post-count-of it)))
@@ -220,8 +221,11 @@
 (def reactor-hook :irc-rpl_endofnames-message ((reactor qwpx-irc-connection) message)
   (let* ((channel-name (second (arguments message)))
 	 (channel (find-channel (connection-of reactor) channel-name)))
-    (maphash-keys #L(start-identification reactor !1)
-		  (users channel))))
+    (bordeaux-threads:make-thread (lambda ()
+				    (maphash-keys #L(progn 
+						      (start-identification reactor !1)
+						      (sleep 1))
+						  (users channel))))))
 
 (def function start-identification (reactor nickname)
   (irc #'whois reactor nickname))

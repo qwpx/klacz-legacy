@@ -68,6 +68,14 @@
 	       ,(getf qualifiers :level 0))))))
 
 
+(def definer bot-function-alias (name new-name)
+     (with-gensyms (reactor message line)
+       `(def bot-function ,new-name (,reactor ,message ,line)
+	     ,(format nil "~A is an alias for ~A" new-name name)
+	     (call-bot-function ,name ,reactor ,message ,line))))
+
+(def bot-function-alias :kick :sage)
+
 (def macro with-arglist (lambda-list (line reactor message) &body body)
   (let ((rest-pos (position '&rest lambda-list)))
     (when (and rest-pos
@@ -82,7 +90,7 @@
 		  `(/= (length ,args) ,(1+ (position '&rest lambda-list)))
 		   `(/= (length ,args) ,(length lambda-list)))
 	     (call-reactor ,reactor :reply-to ,message 
-			   (format nil "Given ~D arguments, but exactly ~D expected."
+			   (format nil "Given ~D argument~:P, but exactly ~D expected."
 				   (length ,args) ,(if rest-pos
 						       (1+ (position '&rest lambda-list))
 						       (length lambda-list))))
@@ -362,3 +370,27 @@
 	  (call-reactor irc-reactor :reply-to message
 			(format nil "You were lucky this time. (chance 1/~D)" n))
 	  (decf n)))))
+
+(def bot-function (:op :level 20) (irc-reactor message line)
+  "Grants operator status to a user."
+  (with-arglist (nick) (line irc-reactor message)
+    (irc #'op irc-reactor (first (arguments message)) nick)))
+
+(def bot-function :describe-function (irc-reactor message line)
+  "Describes function."
+  (with-arglist (function-name) (line irc-reactor message)
+    (let ((function-symbol (concatenate-symbol function-name (find-package :keyword))))
+      (call-reactor irc-reactor :reply-to message
+		    (aif (gethash function-symbol *function-permissions*)
+			 (format nil "Function ~A: Required level: ~D.~%Documentation: ~A" 
+				 function-symbol it
+				 (documentation (find-method #'call-bot-function () `((eql ,function-symbol) t t t)) t))
+			 (format nil "Unknown function: ~A." function-symbol))))))
+	   
+(def bot-function :list-bot-functions (irc-reactor message line)
+  "Prints the list of bot functions."
+  (let ((functions (hash-table-keys *function-permissions*)))
+    (call-reactor irc-reactor :reply-to message
+		  (format nil "~{~{~A~^, ~}~^~%~}"
+			  (group functions 10)))))
+    

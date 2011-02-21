@@ -58,3 +58,13 @@
 (def function join-strings (strings &optional (delimiter ""))
   (reduce (lambda (x y) (concatenate 'string x delimiter y))
           strings))
+
+
+(def function group (source n)
+  (if (zerop n) (error "zero length"))
+  (labels ((rec (source acc)
+             (let ((rest (nthcdr n source)))
+               (if (consp rest)
+                   (rec rest (cons (subseq source 0 n) acc))
+                   (nreverse (cons source acc))))))
+    (if source (rec source nil) nil)))

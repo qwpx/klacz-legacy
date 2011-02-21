@@ -32,10 +32,12 @@
     (let* ((results (do-google-search term))
 	  (first (first results)))
       (call-reactor irc-reactor :reply-to message 
-		    (format nil "~A  -- ~A: ~A" 
-			(cdr (assoc :unescaped-url first))
-			(cdr (assoc :title-no-formatting first))
-			(strip-tags (cdr (assoc :content first))))))))
+		    (if first
+			(format nil "~A  -- ~A: ~A" 
+				(cdr (assoc :unescaped-url first))
+				(cdr (assoc :title-no-formatting first))
+				(strip-tags (cdr (assoc :content first))))
+			(format nil "No results found for query ~S." term))))))
 
 (defparameter *google-translate-url*
   "https://www.googleapis.com/language/translate/v2")

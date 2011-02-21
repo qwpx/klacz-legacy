@@ -26,7 +26,7 @@
    (visible t :type boolean)))
 
 (defpclass* entry () 
-  ((text :type (text 256))
+  ((text :type (text 512))
    (visible t :type boolean)
    (added-at (transaction-timestamp) :type timestamp)
    (added-by :type (text 64))))
@@ -41,7 +41,7 @@
    (kind :type (member action privmsg join part quit))
    (nick :type (text 64))
    (date (transaction-timestamp) :type timestamp)
-   (message :type (text 256))))
+   (message :type (text 512))))
 
 (defpclass* memo ()
   ((from :type (text 64))

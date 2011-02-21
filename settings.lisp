@@ -1,15 +1,18 @@
 (in-package :klacz)
 
-(defparameter *database-host* "localhost")
+(defparameter *database-host* "127.0.0.1")
 (defparameter *database-name* "klacz")
 (defparameter *database-user* "klacz")
 (defparameter *database-password* "klacz")
+
+
+
 
 (defparameter *date-format*
   `((:day 2) #\. (:month 2) #\. (:year 4) #\space (:hour 2) #\: (:min 2) #\: (:sec 2) #\space :timezone))
 
 
-(defparameter *klacz-path* (merge-pathnames "/home/dodek/klacz2/klacz/"))
+(defparameter *klacz-path* (merge-pathnames "/home/dodek/klacz/"))
 (defparameter *nickserv-password-path* (merge-pathnames "nickserv.secret"
 							*klacz-path*))
 (defparameter *google-api-key-path* (merge-pathnames "google.secret"
