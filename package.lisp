@@ -22,9 +22,9 @@
 
 (hu.dwim.def:def hu.dwim.def:package :net.qwpx.klacz-eval 
   (:use :common-lisp :com.informatimago.common-lisp.lisp-reader.reader)
-  (:shadow :* :** :***
-	   :+ :++ :+++
-	   :/ :// :///
+  (:shadow :** :***
+	   :++ :+++
+	   :// :///
 	   :*read-eval*
 	   :*readtable*
 	   :*read-suppress*

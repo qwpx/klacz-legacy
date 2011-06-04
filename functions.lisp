@@ -208,11 +208,22 @@
 	   (result (let* ((*standard-output* out)
 			  (*error-output* out)
 			  (*package* (find-package :klacz-eval))
+			  (* nil) (+ nil) (/ nil)
 			  (form (com.informatimago.common-lisp.lisp-reader.reader:read-from-string code)))
 		     (eval form))))
       (call-reactor irc-reactor :reply-to message
 		    (format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
      
+(def bot-function (:eval-klacz :level 100) (irc-reactor message line)
+  (with-arglist (&rest code) (line irc-reactor message)
+    (let* ((out (make-string-output-stream))
+	   (result (let* ((*standard-output* out)
+			  (*error-output* out)
+			  (form (read-from-string code)))
+		     (eval form))))
+      (call-reactor irc-reactor :reply-to message
+		    (format nil "~A~%~S => ~A" (get-output-stream-string out) result (type-of result))))))
+
 (def bot-function :pick (irc-reactor message line)
   "Sorts items in arbitrary order."
   (flet ((sum-vector (vector)
@@ -387,7 +398,7 @@
 				 (documentation (find-method #'call-bot-function () `((eql ,function-symbol) t t t)) t))
 			 (format nil "Unknown function: ~A." function-symbol))))))
 	   
-(def bot-function :list-bot-functions (irc-reactor message line)
+(def bot-function :list-functions (irc-reactor message line)
   "Prints the list of bot functions."
   (let ((functions (hash-table-keys *function-permissions*)))
     (call-reactor irc-reactor :reply-to message
