@@ -79,11 +79,12 @@
      for cdrs on lines
      repeat *max-bot-lines*
      do (irc #'privmsg reactor target (car cdrs))
-     finally (progn 
-	       (when cdrs
-		 (irc #'privmsg reactor target
-		      (format nil "But wait, there's more! (~D more, type ,more)"
-			      (length cdrs))))
+     finally (when cdrs
+	       (irc #'privmsg reactor target
+		    (if (null (rest cdrs)) 
+			(first cdrs)
+			(format nil "But wait, there's more! (~D more, type ,more)"
+				(length cdrs))))
 	       (setf (more-lines-of reactor) cdrs))))
 
 (def reactor-hook :reply-to ((reactor irc-reactor) message arg)
