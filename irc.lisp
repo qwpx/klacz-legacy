@@ -135,6 +135,25 @@
   (call-reactor *qwpx-irc-reactor* :quit)
   (setf *qwpx-irc-reactor* nil))
 
+(def irc-connection 6irc-irc-connection
+    :server "irc.6irc.net"
+    :nickname "klacz"
+    :channels '("#kucowanie")
+    :nickserv-password *nickserv-password*)
+
+(defvar *6irc-irc-reactor*)
+
+(def function start-6irc-connection (&key (background t))
+  (setf *6irc-irc-reactor* (make-instance '6irc-irc-connection))
+  (run-reactor *6irc-irc-reactor* 
+	       :background background
+	       :initial-bindings `((*standard-output* . ,*standard-output*)
+				   (*error-output* . ,*error-output*))))
+
+(def function stop-6irc-connection ()
+  (call-reactor *6irc-irc-reactor* :quit)
+  (setf *6irc-irc-reactor* nil))
+
 
 (def function create-seen-entry (nick where kind message)
   (purge (s) (from (s seen))
@@ -151,7 +170,8 @@
 (def function maybe-memo (reactor message)
   (let* ((nick (source message))
 	 (memos (select-instances (m memo)
-		  (where (eq (sql-text "lower(_to)") (string-downcase nick)))))
+		  (where (eq (sql-text "lower(_to)") (string-downcase nick)))
+		  (order-by :ascending (date-of m))))
 	 (lines (list* (format nil "~A: You've got ~D new message~:P:"
 			       (source message) (length memos))
 		       (mapcar #L(format nil "From ~A at ~A: ~A"
@@ -187,7 +207,7 @@
 
 
 
-(def reactor-hook :irc-privmsg-message ((reactor qwpx-irc-connection) message)
+(def reactor-hook :irc-privmsg-message ((reactor irc-reactor) message)
   (with-transaction 
     (create-seen-entry (source message) (reply-target message) 
 		       :privmsg (second (arguments message)))
@@ -195,31 +215,31 @@
     (maybe-memo reactor message)
     (parse-message-line reactor message)))
 
-(def reactor-hook :irc-join-message ((reactor qwpx-irc-connection) message)
+(def reactor-hook :irc-join-message ((reactor irc-reactor) message)
   (with-transaction
     (start-identification reactor (source message))
     (create-seen-entry (source message) (reply-target message) 
 		       :join "")))
 
-(def reactor-hook :irc-part-message ((reactor qwpx-irc-connection) message)
+(def reactor-hook :irc-part-message ((reactor irc-reactor) message)
   (with-transaction
     (unidentify reactor (source message))
     (create-seen-entry (source message) (reply-target message) 
 		       :part (or (second (arguments message)) ""))))
 
-(def reactor-hook :irc-quit-message ((reactor qwpx-irc-connection) message)
+(def reactor-hook :irc-quit-message ((reactor irc-reactor) message)
   (with-transaction
     (unidentify reactor (source message))
     (create-seen-entry (source message) "QUIT"
 		       :quit (or (second (arguments message)) ""))))
 
-(def reactor-hook :irc-rpl_whoisidentified-message ((reactor qwpx-irc-connection) message)
+(def reactor-hook :irc-rpl_whoisidentified-message ((reactor irc-reactor) message)
   (let ((nick (second (arguments message)))
 	(account (third (arguments message))))
     (identify reactor nick account)))
 
 
-(def reactor-hook :irc-rpl_endofnames-message ((reactor qwpx-irc-connection) message)
+(def reactor-hook :irc-rpl_endofnames-message ((reactor irc-reactor) message)
   (let* ((channel-name (second (arguments message)))
 	 (channel (find-channel (connection-of reactor) channel-name)))
     (bordeaux-threads:make-thread (lambda ()
