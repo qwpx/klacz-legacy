@@ -382,6 +382,19 @@
 			(format nil "You were lucky this time. (chance 1/~D)" n))
 	  (decf n)))))
 
+;;; antoszka
+(def bot-function :remove-term (irc-reactor message line)
+  "Removes term altogether, including all entries."
+  (with-arglist (term-name) (line irc-reactor message)
+    (with-term (term) (term-name irc-reactor message)
+      (let ((name-of-term (name-of term)))
+	(mapcar #'purge-instance
+		(select-instances (e entry)
+		  (where (eq (term-of e) term))))
+	(purge-instance term)
+	(call-reactor irc-reactor :reply-to message
+		      (format nil "Removed term ~A." name-of-term))))))
+
 (def bot-function (:op :level 20) (irc-reactor message line)
   "Grants operator status to a user."
   (with-arglist (nick) (line irc-reactor message)
