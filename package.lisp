@@ -69,6 +69,7 @@
 	   :namestring
 	   :open
 	   :probe-file
+	   :package-use-list
 	   :rename-file
 	   :rename-package
 	   :require
