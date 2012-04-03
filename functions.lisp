@@ -70,9 +70,12 @@
 
 (def definer bot-function-alias (name new-name)
      (with-gensyms (reactor message line)
-       `(def bot-function ,new-name (,reactor ,message ,line)
-	     ,(format nil "~A is an alias for ~A" new-name name)
-	     (call-bot-function ,name ,reactor ,message ,line))))
+       `(progn
+	  (def bot-function ,new-name (,reactor ,message ,line)
+	       ,(format nil "~A is an alias for ~A" new-name name)
+	       (call-bot-function ,name ,reactor ,message ,line))
+	  (setf (gethash ,new-name *function-permissions*)
+		(gethash ,name *function-permissions* 0)))))
 
 (def bot-function-alias :kick :sage)
 
@@ -186,7 +189,7 @@
 		  (format nil "Attempting to identify ~A." nick))))
 
 (def bot-function (:add-level :level 100) (irc-reactor message line)
-  "Increases user privileges."
+  "Increases user privileges, syntax: ,add-level account channel new-level."
   (with-arglist (account channel new-level) (line irc-reactor message)
     (setf new-level (parse-integer new-level))
     (purge (l) (from (l level)) 
@@ -200,6 +203,9 @@
 (def bot-function (:kick :level 10) (irc-reactor message line)
   "Kicks given user."
   (with-arglist (nick &rest reason) (line irc-reactor message)
+    (when (string-equal nick (default-nickname-of irc-reactor))
+      (setf nick (source message)
+	    reason "NA PANA REKE PODNOSISZ, POLSKI PSIE?"))
     (irc #'kick irc-reactor (reply-target message) nick reason)))
 
 (def bot-function (:eval :level 5) (irc-reactor message line)
@@ -416,4 +422,39 @@
     (call-reactor irc-reactor :reply-to message
 		  (format nil "~{~{~A~^, ~}~^~%~}"
 			  (group functions 10)))))
+
+(defun find-advice-images () 
+  (let ((pathnames (directory (merge-pathnames *advice-images-path* "*.jpg"))))
+    (mapcar (lambda (path)
+	      (cons (pathname-name path) (file-namestring path)))
+	    pathnames)))
     
+(def bot-function :advice (irc-reactor message line)
+  "Creates advice image, syntax: ,advice nick \"top\" \"bottom\""
+  (with-arglist (name &rest advice) (line irc-reactor message)
+    (let ((advice-regexp (ppcre:create-scanner "\\s*\"(.*?)\"\\s+\"(.*?)\"\\s*"))
+	  (image (cdr (assoc name (find-advice-images) :test #'string-equal)))
+	  (out-name (format nil "~A.jpg" (now))))
+      (if (not (ppcre:scan advice-regexp advice))
+	  (call-reactor irc-reactor :reply-to message
+			"invalid syntax, expected ,advice nick \"top\" \"bottom\"")
+	  (ppcre:do-register-groups (top bottom) (advice-regexp advice)
+	    (if (not image)
+		(call-reactor irc-reactor :reply-to message
+			      (format nil "Unknown name: ~A" name))
+		(progn 
+		  (trivial-shell:shell-command 
+		   (format nil "cd ~A && ./advice.sh advice/~A ~S ~S ~A"
+			   *klacz-path* image (string-upcase top) (string-upcase bottom)
+			   (merge-pathnames *advice-path* out-name)))
+		  (make-instance 'advice :name name :image-name out-name :top top :bottom bottom)
+		  (call-reactor irc-reactor :reply-to message 
+				(format nil "~A~A" *advice-url* out-name)))))))))
+
+
+(def bot-function :advice-images (irc-reactor message line)
+  "Lists advice images"
+  (call-reactor irc-reactor :reply-to message
+		(format nil "Available advice images: ~{~A~^, ~}."
+			(mapcar #'car (find-advice-images)))))
+

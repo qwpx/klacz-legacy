@@ -25,6 +25,7 @@
   (:shadow :** :***
 	   :++ :+++
 	   :// :///
+	   :*package*
 	   :*read-eval*
 	   :*readtable*
 	   :*read-suppress*

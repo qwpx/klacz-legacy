@@ -6,6 +6,9 @@
 (defparameter *database-password* "klacz")
 
 
+(defparameter *qwpx-irc-server* "irc.freenode.net")
+(defparameter *qwpx-irc-nickname* "klacz")
+(defparameter *qwpx-irc-channels* '("#xyzzytest" "#qwpx" "#lisp-pl" "#haskell-pl"))
 
 
 (defparameter *date-format*
@@ -34,3 +37,8 @@
 (defparameter *min-topic-user-delay* '(2 :day))
 
 (defparameter *topic-delimiter* "|")
+
+(defparameter *advice-path* (merge-pathnames "/home/dodek/www/dodecki.net/advice/"))
+(defparameter *advice-url* "http://dodecki.net/advice/")
+(defparameter *advice-images-path* (merge-pathnames "/home/dodek/klacz/advice/"))
+

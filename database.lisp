@@ -73,3 +73,11 @@
   ((account :type (text 64))
    (channel :type (text 64))
    (level :type integer)))
+
+(defpclass* advice ()
+  ((name :type (text 64))
+   (date (transaction-timestamp) :type timestamp)
+   (image-name :type (text 128))
+   (top :type (text 256))
+   (bottom :type (text 256))))
+   

@@ -12,7 +12,7 @@
     :licence "GNU GPL v3"
     :description "Klacz IRC bot."
     :properties ((#:author-email . "dodek@dodecki.net"))
-    :depends-on (:cl-irc :bordeaux-threads :cl-ppcre 
+    :depends-on (:cl-irc :bordeaux-threads :cl-ppcre :trivial-shell
                  :metabang-bind :anaphora :alexandria 
 		 :hu.dwim.defclass-star+hu.dwim.def :closer-mop
                  :chanl :trivial-timeout :local-time
