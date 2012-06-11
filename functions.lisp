@@ -428,7 +428,8 @@
     (mapcar (lambda (path)
 	      (cons (pathname-name path) (file-namestring path)))
 	    pathnames)))
-    
+
+
 (def bot-function :advice (irc-reactor message line)
   "Creates advice image, syntax: ,advice nick \"top\" \"bottom\""
   (with-arglist (name &rest advice) (line irc-reactor message)
@@ -458,3 +459,18 @@
 		(format nil "Available advice images: ~{~A~^, ~}."
 			(mapcar #'car (find-advice-images)))))
 
+(def bot-function :math (irc-reactor message line)
+  "Posts equation to mathbin"
+  (with-arglist (&rest math) (line irc-reactor message)
+      (multiple-value-bind (body status headers uri stream must-close reason)
+	  (drakma:http-request "http://mathbin.net/index.html"
+			       :parameters `(("title" . "#qwpx")
+					     ("name" . "klacz")
+					     ("save" . "1")
+					     ("id" . "")
+					     ("body" . ,(format nil "[EQ]~A[/EQ]" math))))
+	(declare (ignore body status headers stream must-close reason))
+	(let ((n (subseq (puri:uri-path uri) 1)))
+	  (setf (puri:uri-path uri) (format nil "/equations/~A_0.png" n))
+	  (call-reactor irc-reactor :reply-to message
+			"asd")))))

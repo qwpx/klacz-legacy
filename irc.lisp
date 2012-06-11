@@ -62,8 +62,9 @@
   (apply #'call-reactor reactor :irc function args))
 
 (def reactor-hook :quit ((reactor irc-reactor) &optional message)
-  (quit (connection-of reactor) message)
-  (stop-worker-reactor (worker-reactor-of reactor))
+  (unwind-protect 
+       (quit (connection-of reactor) message)
+    (stop-worker-reactor (worker-reactor-of reactor)))
   (call-next-method))
 
 
