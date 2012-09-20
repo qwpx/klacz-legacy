@@ -473,4 +473,4 @@
 	(let ((n (subseq (puri:uri-path uri) 1)))
 	  (setf (puri:uri-path uri) (format nil "/equations/~A_0.png" n))
 	  (call-reactor irc-reactor :reply-to message
-			"asd")))))
+			(puri:render-uri uri nil))))))

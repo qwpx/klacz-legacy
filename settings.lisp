@@ -39,6 +39,6 @@
 (defparameter *topic-delimiter* "|")
 
 (defparameter *advice-path* (merge-pathnames "/home/dodek/www/dodecki.net/advice/"))
-(defparameter *advice-url* "http://dodecki.net/advice/")
+(defparameter *advice-url* "http://advice.qwpx.net/")
 (defparameter *advice-images-path* (merge-pathnames "/home/dodek/klacz/advice/"))
 
